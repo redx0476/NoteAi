@@ -1,0 +1,28 @@
+{
+  "name": "noteai",
+  "version": "1.0.0",
+  "private": true,
+  "description": "NOTEAI — AI meeting notes (Next.js full-stack, Postgres, live transcription)",
+  "scripts": {
+    "dev": "node server.js",
+    "build": "next build",
+    "start": "cross-env NODE_ENV=production node server.js",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "dotenv": "^16.4.5",
+    "jsonwebtoken": "^9.0.2",
+    "next": "^14.2.35",
+    "pg": "^8.13.1",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "autoprefixer": "^10.4.20",
+    "cross-env": "^7.0.3",
+    "postcss": "^8.4.47",
+    "tailwindcss": "^3.4.13"
+  }
+}
