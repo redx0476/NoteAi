@@ -8,7 +8,7 @@ import { startMicIngest } from '@/lib/client/recorder';
 import Avatar from '@/components/Avatar';
 import { useToast } from '@/components/Toast';
 import {
-  IconShare, IconCopy, IconDownload, IconTrash, IconChevron, IconStar, IconSend, IconCheck, IconSearch,
+  IconShare, IconCopy, IconDownload, IconTrash, IconChevron, IconStar, IconSend, IconCheck, IconSearch, IconPencil,
 } from '@/components/Icons';
 
 function Section({ title, icon, defaultOpen = true, right, children }) {
@@ -126,6 +126,7 @@ function MeetingView() {
   const [tq, setTq] = useState('');
   const [interim, setInterim] = useState(null);
   const [showBulk, setShowBulk] = useState(false);
+  const [editing, setEditing] = useState(null);
   const [recording, setRecording] = useState(false);
   const socketRef = useRef(null);
   const recorderRef = useRef(null);
@@ -238,12 +239,18 @@ function MeetingView() {
     toast('Highlight saved ⭐');
     reload();
   }
-  async function renameSpeaker(from) {
-    const names = (m.participants || []).filter((n) => n !== from);
-    const hint = names.length ? `\n\nAttendees: ${names.join(', ')}` : '';
-    const to = prompt(`Rename "${from}" to:${hint}`, names[0] || from);
+  function startEdit(key, from) {
+    setEditing({ key, from, value: from });
+  }
+  function cancelEdit() {
+    setEditing(null);
+  }
+  async function saveSpeakerName(from, rawTo) {
+    const to = (rawTo || '').trim();
+    setEditing(null);
     if (!to || to === from) return;
     await api(`/api/meetings/${id}/speakers`, { from, to });
+    toast('Speaker renamed ✓');
     reload();
   }
   function seekTo(t) {
@@ -460,16 +467,37 @@ function MeetingView() {
                     </button>
                   </div>
                   <div className="mt-3 flex flex-wrap gap-2">
-                    {speakers.map((sp) => (
-                      <button
-                        key={sp}
-                        onClick={() => renameSpeaker(sp)}
-                        className="chip border border-slate-200 hover:bg-slate-50"
-                        style={{ color: colorFor(sp) }}
-                      >
-                        <Avatar name={sp} size={18} /> {sp}
-                      </button>
-                    ))}
+                    {speakers.map((sp) => {
+                      const key = `chip:${sp}`;
+                      if (editing?.key === key) {
+                        return (
+                          <SpeakerNameInput
+                            key={sp}
+                            attendees={m.participants}
+                            value={editing.value}
+                            onChange={(v) => setEditing((e) => ({ ...e, value: v }))}
+                            onSave={() => saveSpeakerName(sp, editing.value)}
+                            onCancel={cancelEdit}
+                          />
+                        );
+                      }
+                      return (
+                        <span
+                          key={sp}
+                          className="chip border border-slate-200"
+                          style={{ color: colorFor(sp) }}
+                        >
+                          <Avatar name={sp} size={18} /> {sp}
+                          <button
+                            onClick={() => startEdit(key, sp)}
+                            className="ml-1 text-slate-400 hover:text-brand"
+                            title="Rename speaker"
+                          >
+                            <IconPencil width={13} height={13} />
+                          </button>
+                        </span>
+                      );
+                    })}
                   </div>
                   {showBulk && <BulkSpeakers meeting={m} onDone={reload} toast={toast} />}
                 </div>
@@ -492,13 +520,31 @@ function MeetingView() {
                       <Avatar name={s.speaker} size={30} />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-baseline gap-2">
-                          <button
-                            onClick={() => renameSpeaker(s.speaker)}
-                            className="text-sm font-semibold hover:underline"
-                            style={{ color: colorFor(s.speaker) }}
-                          >
-                            {s.speaker}
-                          </button>
+                          {editing?.key === `seg:${i}` ? (
+                            <SpeakerNameInput
+                              attendees={m.participants}
+                              value={editing.value}
+                              onChange={(v) => setEditing((e) => ({ ...e, value: v }))}
+                              onSave={() => saveSpeakerName(s.speaker, editing.value)}
+                              onCancel={cancelEdit}
+                            />
+                          ) : (
+                            <span className="flex items-center gap-1">
+                              <span
+                                className="text-sm font-semibold"
+                                style={{ color: colorFor(s.speaker) }}
+                              >
+                                {s.speaker}
+                              </span>
+                              <button
+                                onClick={() => startEdit(`seg:${i}`, s.speaker)}
+                                className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-brand no-print"
+                                title="Rename speaker"
+                              >
+                                <IconPencil width={13} height={13} />
+                              </button>
+                            </span>
+                          )}
                           <button onClick={() => seekTo(s.tOffset)} className="text-xs text-slate-400 tabular-nums hover:text-brand">
                             {fmtTime(s.tOffset)}
                           </button>
@@ -536,6 +582,34 @@ function MeetingView() {
         )}
       </div>
     </div>
+  );
+}
+
+function SpeakerNameInput({ value, onChange, onSave, onCancel, attendees }) {
+  return (
+    <span className="inline-flex items-center gap-1">
+      <input
+        autoFocus
+        list="mn-attendees"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') onSave();
+          else if (e.key === 'Escape') onCancel();
+        }}
+        onBlur={onCancel}
+        className="input py-1 text-sm w-40"
+        placeholder="Speaker name…"
+      />
+      <datalist id="mn-attendees">
+        {(attendees || []).map((n) => (
+          <option key={n} value={n} />
+        ))}
+      </datalist>
+      <button onMouseDown={(e) => e.preventDefault()} onClick={onSave} className="text-brand hover:opacity-80" title="Save">
+        <IconCheck width={15} height={15} />
+      </button>
+    </span>
   );
 }
 

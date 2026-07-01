@@ -2,7 +2,10 @@ import { useEffect, useRef, useState } from 'react';
 
 const API_BASE = 'http://localhost:3000';
 const MODELS = [
+  ['nvidia/nemotron-3-super-120b-a12b:free', 'Nemotron 3 Super — 1M context'],
   ['openai/gpt-oss-120b:free', 'GPT-OSS 120B — best free'],
+  ['google/gemma-4-31b-it:free', 'Gemma 4 31B — fast, 256K'],
+  ['nvidia/nemotron-3-ultra-550b-a55b:free', 'Nemotron 3 Ultra — top quality'],
   ['openai/gpt-oss-20b:free', 'GPT-OSS 20B — free & fast'],
   ['meta-llama/llama-3.3-70b-instruct:free', 'Llama 3.3 70B — free'],
   ['qwen/qwen3-next-80b-a3b-instruct:free', 'Qwen3 Next 80B — free'],

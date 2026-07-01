@@ -19,3 +19,4 @@ export const IconChevron = (p) => (<svg {...base} {...p}><path d="m6 9 6 6 6-6"/
 export const IconSend = (p) => (<svg {...base} {...p}><path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4 20-7Z"/></svg>);
 export const IconLogout = (p) => (<svg {...base} {...p}><path d="M15 4h4a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-4"/><path d="M10 17l5-5-5-5"/><path d="M15 12H3"/></svg>);
 export const IconCheck = (p) => (<svg {...base} {...p}><path d="M20 6 9 17l-5-5"/></svg>);
+export const IconPencil = (p) => (<svg {...base} {...p}><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5Z"/></svg>);
