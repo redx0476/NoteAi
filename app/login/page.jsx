@@ -13,7 +13,12 @@ export default function AuthPage() {
   const router = useRouter();
 
   useEffect(() => {
-    if (auth.token()) router.replace('/app');
+    if (auth.token()) {
+      router.replace('/app');
+      return;
+    }
+    const qp = new URLSearchParams(window.location.search).get('mode');
+    if (qp === 'signup' || qp === 'login') setMode(qp);
   }, [router]);
 
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));

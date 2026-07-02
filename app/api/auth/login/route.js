@@ -6,9 +6,15 @@ export const dynamic = 'force-dynamic';
 
 export async function POST(request) {
   const { email, password } = await request.json().catch(() => ({}));
-  const { rows } = await pool.query('SELECT * FROM users WHERE email = $1', [(email || '').toLowerCase()]);
+  // Length cap before bcrypt: hashing arbitrarily long input is a cheap DoS.
+  if (!email || !password || typeof password !== 'string' || password.length > 512) {
+    return Response.json({ error: 'Invalid email or password' }, { status: 401 });
+  }
+  const { rows } = await pool.query('SELECT id, email, name, password FROM users WHERE email = $1', [
+    email.toLowerCase(),
+  ]);
   const user = rows[0];
-  if (!user || !bcrypt.compareSync(password || '', user.password)) {
+  if (!user || !bcrypt.compareSync(password, user.password)) {
     return Response.json({ error: 'Invalid email or password' }, { status: 401 });
   }
   return Response.json({

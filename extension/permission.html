@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>NOTEAI — Microphone access</title>
+    <style>
+      :root { color-scheme: light dark; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+        background: #0f1117;
+        color: #e8eaf0;
+      }
+      .card {
+        max-width: 420px;
+        padding: 32px;
+        border-radius: 16px;
+        background: #171a23;
+        border: 1px solid #262b38;
+        text-align: center;
+      }
+      .icon { font-size: 40px; margin-bottom: 12px; }
+      h1 { font-size: 18px; margin: 0 0 8px; }
+      p { font-size: 14px; line-height: 1.5; color: #9aa3b5; margin: 0 0 16px; }
+      .ok { color: #4ade80; }
+      .err { color: #f87171; }
+      button {
+        font: inherit;
+        padding: 10px 20px;
+        border-radius: 10px;
+        border: none;
+        background: #6366f1;
+        color: #fff;
+        cursor: pointer;
+      }
+      button:hover { background: #575ae8; }
+      .hidden { display: none; }
+      ol { text-align: left; font-size: 13px; color: #9aa3b5; line-height: 1.7; }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <div class="icon">🎙️</div>
+      <div id="asking">
+        <h1>Allow microphone access</h1>
+        <p>NOTEAI needs your microphone so your own voice shows up in the live transcript. Click <b>Allow</b> in the browser prompt.</p>
+      </div>
+      <div id="granted" class="hidden">
+        <h1 class="ok">Microphone enabled ✓</h1>
+        <p>You're all set — returning to your meeting…</p>
+      </div>
+      <div id="denied" class="hidden">
+        <h1 class="err">Microphone is blocked</h1>
+        <p>Chrome blocked microphone access for this extension. To unblock it:</p>
+        <ol>
+          <li>Click the 🔒 / ⓘ icon at the left of the address bar.</li>
+          <li>Set <b>Microphone</b> to <b>Allow</b>.</li>
+          <li>Click <b>Try again</b> below.</li>
+        </ol>
+        <button id="retry">Try again</button>
+      </div>
+    </div>
+    <script src="permission.js"></script>
+  </body>
+</html>

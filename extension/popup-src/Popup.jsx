@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 
 const API_BASE = 'http://localhost:3000';
+// Kept in sync with the app/backend allowlist (lib/client/api.js, lib/services/llm.js).
 const MODELS = [
-  ['nvidia/nemotron-3-super-120b-a12b:free', 'Nemotron 3 Super — 1M context'],
-  ['openai/gpt-oss-120b:free', 'GPT-OSS 120B — best free'],
-  ['google/gemma-4-31b-it:free', 'Gemma 4 31B — fast, 256K'],
-  ['nvidia/nemotron-3-ultra-550b-a55b:free', 'Nemotron 3 Ultra — top quality'],
+  ['nvidia/nemotron-3-super-120b-a12b:free', 'Nemotron 3 Super — 1M context, best for long meetings'],
+  ['openai/gpt-oss-120b:free', 'GPT-OSS 120B — best free quality'],
+  ['google/gemma-4-31b-it:free', 'Gemma 4 31B — fast, 256K context'],
+  ['nvidia/nemotron-3-ultra-550b-a55b:free', 'Nemotron 3 Ultra — highest quality, slower'],
   ['openai/gpt-oss-20b:free', 'GPT-OSS 20B — free & fast'],
   ['meta-llama/llama-3.3-70b-instruct:free', 'Llama 3.3 70B — free'],
   ['qwen/qwen3-next-80b-a3b-instruct:free', 'Qwen3 Next 80B — free'],
@@ -78,17 +79,39 @@ export default function Popup() {
     setUser(null);
   }
 
+  // Chrome can't show the mic permission prompt inside an action popup (or the
+  // offscreen doc that does the capture), so we only *check* the state here.
+  // When it isn't granted yet, the background opens permission.html in a real
+  // tab — which can prompt — and auto-starts the capture once access is given.
+  async function micPermissionState() {
+    try {
+      const st = await navigator.permissions.query({ name: 'microphone' });
+      return st.state; // 'granted' | 'prompt' | 'denied'
+    } catch {
+      return 'prompt';
+    }
+  }
+
   async function start() {
     setMsg('Starting…');
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     const platform = /meet\.google\.com/.test(tab.url) ? 'meet' : /teams\./.test(tab.url) ? 'teams' : 'manual';
-    const resp = await chrome.runtime.sendMessage({
-      type: 'START_CAPTURE',
+    const startPayload = {
       tabId: tab.id,
       title: tab.title?.replace(/ - Google Meet| \| Microsoft Teams/, '') || 'Meeting',
       platform,
       meetingUrl: tab.url,
-    });
+    };
+
+    if ((await micPermissionState()) !== 'granted') {
+      // Opens the permission tab (this popup will close); recording starts
+      // automatically on the meeting tab after the user clicks Allow.
+      setMsg('Waiting for microphone access…');
+      await chrome.runtime.sendMessage({ type: 'REQUEST_MIC_PERMISSION', pendingStart: startPayload });
+      return;
+    }
+
+    const resp = await chrome.runtime.sendMessage({ type: 'START_CAPTURE', ...startPayload });
     if (resp?.ok) {
       setRecording(true);
       setMsg('');

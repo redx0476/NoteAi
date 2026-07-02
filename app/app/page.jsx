@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { api, uploadAudio, preferredModel, dayLabel, fmtDate, durationMin, platformLabel } from '@/lib/client/api';
@@ -33,13 +33,18 @@ export default function Home() {
   const [importing, setImporting] = useState(false);
   const toast = useToast();
   const router = useRouter();
+  const loadSeq = useRef(0);
 
   async function load(query = '') {
+    // Sequence guard: fast typing can make an older request resolve after a
+    // newer one — only the latest request may update the list.
+    const seq = ++loadSeq.current;
     setLoading(true);
     try {
-      setItems(await api('/api/meetings' + (query ? `?q=${encodeURIComponent(query)}` : '')));
+      const rows = await api('/api/meetings' + (query ? `?q=${encodeURIComponent(query)}` : ''));
+      if (seq === loadSeq.current) setItems(rows);
     } finally {
-      setLoading(false);
+      if (seq === loadSeq.current) setLoading(false);
     }
   }
 
@@ -59,11 +64,10 @@ export default function Home() {
     }
   }
 
+  // One effect covers both the initial load (q === '', no delay) and debounced
+  // search — the old separate mount effect double-fetched the list.
   useEffect(() => {
-    load();
-  }, []);
-  useEffect(() => {
-    const t = setTimeout(() => load(q), 250);
+    const t = setTimeout(() => load(q), q ? 250 : 0);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q]);

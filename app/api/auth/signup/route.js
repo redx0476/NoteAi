@@ -6,8 +6,8 @@ export const dynamic = 'force-dynamic';
 
 export async function POST(request) {
   const { email, password, name } = await request.json().catch(() => ({}));
-  if (!email || !password || password.length < 6) {
-    return Response.json({ error: 'Email and a password (6+ chars) are required' }, { status: 400 });
+  if (!email || !password || typeof password !== 'string' || password.length < 6 || password.length > 512) {
+    return Response.json({ error: 'Email and a password (6–512 chars) are required' }, { status: 400 });
   }
   const exists = await pool.query('SELECT id FROM users WHERE email = $1', [email.toLowerCase()]);
   if (exists.rows[0]) {

@@ -1,7 +1,7 @@
 import { randomUUID } from 'crypto';
 import { pool } from '@/lib/db';
 import { getUserFromRequest } from '@/lib/auth';
-import { serialize, getMeeting } from '@/lib/meetings';
+import { serialize, getMeeting, MEETING_COLS } from '@/lib/meetings';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,17 +14,20 @@ export async function GET(request) {
   let rows;
   if (q) {
     const like = `%${q}%`;
+    // EXISTS instead of JOIN+DISTINCT: no fan-out over segment rows, meetings
+    // stay unique by construction.
     ({ rows } = await pool.query(
-      `SELECT DISTINCT m.* FROM meetings m
-       LEFT JOIN segments s ON s.meeting_id = m.id
+      `SELECT ${MEETING_COLS} FROM meetings m
        WHERE m.user_id = $1
-         AND (m.title ILIKE $2 OR m.summary ILIKE $2 OR s.text ILIKE $2)
-       ORDER BY m.started_at DESC`,
+         AND (m.title ILIKE $2 OR m.summary ILIKE $2
+              OR EXISTS (SELECT 1 FROM segments s WHERE s.meeting_id = m.id AND s.text ILIKE $2))
+       ORDER BY m.started_at DESC
+       LIMIT 200`,
       [payload.uid, like]
     ));
   } else {
     ({ rows } = await pool.query(
-      'SELECT * FROM meetings WHERE user_id = $1 ORDER BY started_at DESC',
+      `SELECT ${MEETING_COLS} FROM meetings WHERE user_id = $1 ORDER BY started_at DESC LIMIT 200`,
       [payload.uid]
     ));
   }

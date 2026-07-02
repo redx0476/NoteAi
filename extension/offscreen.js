@@ -1,19 +1,30 @@
-// Runs in the offscreen document. Captures the meeting tab's audio and streams
-// it to the backend for real-time transcription.
+// Runs in the offscreen document. Captures the meeting tab's audio AND the
+// user's microphone and streams them to the backend for real-time transcription.
+//
+// The two sources are kept on separate channels so speakers can be told apart
+// deterministically: channel 0 = the microphone ("You"), channel 1 = the
+// meeting tab (the other participants). Deepgram runs in multichannel mode.
 //
 // Primary path (Deepgram configured): open a WebSocket to /ws/ingest and stream
-// raw PCM (linear16, 16 kHz, mono). Transcripts (interim + final, with speaker
-// labels) come back down the same socket and are relayed to the live panel.
+// raw interleaved-stereo PCM (linear16, 16 kHz, 2 channels). Transcripts (interim
+// + final, with speaker labels) come back down the same socket and are relayed
+// to the live panel.
 //
-// Fallback path (no streaming provider): record short WebM chunks and POST them
-// to /api/transcribe/:id.
+// Fallback path (no streaming provider): record short WebM chunks of a mono mix
+// of mic + tab and POST them to /api/transcribe/:id.
 //
 // Either way, the tab audio is also piped to the speakers so the user still
-// hears the meeting.
+// hears the meeting. The microphone is never routed to the speakers (that would
+// cause echo/feedback).
 
-let stream = null;
+let stream = null; // tab-audio stream
+let micStream = null; // microphone stream (null if permission denied / no device)
 let ctx = null;
-let source = null;
+let tabSource = null;
+let micSource = null;
+let merger = null; // 2-ch tap node: ch0 = mic, ch1 = tab
+let mixDest = null; // mono mixed stream for the batch recorder
+let analyser = null;
 let processor = null;
 let workletNode = null;
 let pcmSink = null;
@@ -43,8 +54,41 @@ async function start(msg) {
   });
 
   ctx = new AudioContext();
-  source = ctx.createMediaStreamSource(stream);
-  source.connect(ctx.destination); // keep playing audio to the user
+  tabSource = ctx.createMediaStreamSource(stream);
+  tabSource.connect(ctx.destination); // keep playing the meeting audio to the user
+
+  // Capture the local microphone so the user's own speech is transcribed. One
+  // retry covers transient errors (device briefly busy). If it still fails
+  // (permission not granted to the extension origin / no device), continue with
+  // tab audio only — the mic channel simply stays silent so remote speakers are
+  // still labeled right — and report MIC_DENIED so the user gets warned.
+  const openMic = () =>
+    navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+    });
+  try {
+    try {
+      micStream = await openMic();
+    } catch {
+      await new Promise((r) => setTimeout(r, 1000));
+      micStream = await openMic();
+    }
+    micSource = ctx.createMediaStreamSource(micStream);
+  } catch (err) {
+    micStream = null;
+    micSource = null;
+    chrome.runtime.sendMessage({ type: 'MIC_DENIED', message: String(err?.message || err) }).catch(() => {});
+  }
+
+  // Stereo tap: channel 0 = mic ("You"), channel 1 = meeting tab.
+  merger = ctx.createChannelMerger(2);
+  if (micSource) micSource.connect(merger, 0, 0);
+  tabSource.connect(merger, 0, 1);
+
+  // Mono mixed stream for the batch-fallback recorder (captures both voices).
+  mixDest = ctx.createMediaStreamDestination();
+  if (micSource) micSource.connect(mixDest);
+  tabSource.connect(mixDest);
 
   if (cfg.streaming && cfg.wsBase) {
     startStreaming();
@@ -52,10 +96,10 @@ async function start(msg) {
     startBatch();
   }
 
-  // Report a rough input level to the popup for the live meter.
-  const analyser = ctx.createAnalyser();
+  // Report a rough input level to the popup for the live meter (mic + meeting).
+  analyser = ctx.createAnalyser();
   analyser.fftSize = 512;
-  source.connect(analyser);
+  merger.connect(analyser);
   const buf = new Float32Array(analyser.fftSize);
   levelTimer = setInterval(() => {
     analyser.getFloatTimeDomainData(buf);
@@ -118,14 +162,19 @@ function startStreaming() {
 }
 
 async function attachPcmTap() {
-  const inRate = ctx.sampleRate;
   // Preferred path: AudioWorkletNode (ScriptProcessorNode is deprecated). The
   // worklet module is same-origin to the offscreen doc, so no web-accessible
   // resource entry is required.
   try {
     await ctx.audioWorklet.addModule(chrome.runtime.getURL('pcm-worklet.js'));
-    workletNode = new AudioWorkletNode(ctx, 'pcm-tap');
-    source.connect(workletNode);
+    workletNode = new AudioWorkletNode(ctx, 'pcm-tap', {
+      numberOfInputs: 1,
+      numberOfOutputs: 1,
+      channelCount: 2,
+      channelCountMode: 'explicit',
+      channelInterpretation: 'discrete',
+    });
+    merger.connect(workletNode);
     // Route through a muted gain node so the graph keeps pulling audio.
     pcmSink = ctx.createGain();
     pcmSink.gain.value = 0;
@@ -133,18 +182,19 @@ async function attachPcmTap() {
     pcmSink.connect(ctx.destination);
     workletNode.port.onmessage = (e) => {
       if (!socket || socket.readyState !== WebSocket.OPEN) return;
-      const pcm = downsampleToInt16(e.data, inRate, TARGET_RATE);
+      const { left, right } = e.data;
+      const pcm = downsampleStereoInterleaved(left, right, ctx.sampleRate, TARGET_RATE);
       if (pcm.byteLength) socket.send(pcm);
     };
   } catch {
     // AudioWorklet unavailable — fall back to the deprecated ScriptProcessor.
-    attachScriptProcessorTap(inRate);
+    attachScriptProcessorTap();
   }
 }
 
-function attachScriptProcessorTap(inRate) {
-  processor = ctx.createScriptProcessor(4096, 1, 1);
-  source.connect(processor);
+function attachScriptProcessorTap() {
+  processor = ctx.createScriptProcessor(4096, 2, 2);
+  merger.connect(processor);
   // Connect through a muted gain node so the processor keeps firing.
   const sink = ctx.createGain();
   sink.gain.value = 0;
@@ -154,8 +204,9 @@ function attachScriptProcessorTap(inRate) {
 
   processor.onaudioprocess = (e) => {
     if (!socket || socket.readyState !== WebSocket.OPEN) return;
-    const input = e.inputBuffer.getChannelData(0);
-    const pcm = downsampleToInt16(input, inRate, TARGET_RATE);
+    const left = e.inputBuffer.getChannelData(0);
+    const right = e.inputBuffer.numberOfChannels > 1 ? e.inputBuffer.getChannelData(1) : null;
+    const pcm = downsampleStereoInterleaved(left, right, ctx.sampleRate, TARGET_RATE);
     if (pcm.byteLength) socket.send(pcm);
   };
 }
@@ -176,22 +227,29 @@ function teardownPcmTap() {
   }
 }
 
-// Downsample a Float32 mono buffer to 16-bit PCM at the target rate.
-function downsampleToInt16(input, inRate, outRate) {
+// Downsample two Float32 mono buffers (left/right) to interleaved 16-bit PCM at
+// the target rate. `right` may be null (mic missing) → emitted as silence.
+function downsampleStereoInterleaved(left, right, inRate, outRate) {
   const ratio = inRate / outRate;
-  const outLen = Math.floor(input.length / ratio);
-  const out = new Int16Array(outLen);
+  const outLen = Math.floor(left.length / ratio);
+  const out = new Int16Array(outLen * 2);
   let pos = 0;
   for (let i = 0; i < outLen; i++) {
     const idx = Math.floor(i * ratio);
-    let s = input[idx];
-    s = Math.max(-1, Math.min(1, s));
-    out[pos++] = s < 0 ? s * 0x8000 : s * 0x7fff;
+    let l = Math.max(-1, Math.min(1, left[idx]));
+    let r = right ? Math.max(-1, Math.min(1, right[idx])) : 0;
+    out[pos++] = l < 0 ? l * 0x8000 : l * 0x7fff;
+    out[pos++] = r < 0 ? r * 0x8000 : r * 0x7fff;
   }
   return out.buffer;
 }
 
 // ── Batch fallback path ─────────────────────────────────────────────────────
+function batchStream() {
+  // Prefer the mixed mic+tab stream so the user's voice is captured too.
+  return mixDest?.stream || stream;
+}
+
 function startBatch() {
   mode = 'batch';
   recordNextChunk();
@@ -203,7 +261,7 @@ function recordNextChunk() {
   const opts = {};
   const mime = pickMime();
   if (mime) opts.mimeType = mime;
-  recorder = new MediaRecorder(stream, opts);
+  recorder = new MediaRecorder(batchStream(), opts);
   recorder.ondataavailable = (e) => e.data.size && chunks.push(e.data);
   recorder.onstop = async () => {
     if (chunks.length) {
@@ -221,6 +279,7 @@ async function uploadChunk(blob) {
   const form = new FormData();
   form.append('audio', blob, 'chunk.webm');
   form.append('tOffset', String(tOffset));
+  form.append('speaker', 'Speaker 1');
   const res = await fetch(`${cfg.apiBase}/api/transcribe/${cfg.meetingId}`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${cfg.token}` },
@@ -233,7 +292,7 @@ async function uploadChunk(blob) {
       kind: 'final',
       text: data.text,
       tOffset,
-      speaker: 'Speaker',
+      speaker: 'Speaker 1',
       meetingId: cfg.meetingId,
     }).catch(() => {});
   }
@@ -247,7 +306,9 @@ function pickMime() {
 // ── Stop / cleanup ──────────────────────────────────────────────────────────
 function stop() {
   const s = stream;
+  const mic = micStream;
   stream = null; // breaks the batch loop
+  micStream = null;
   mode = null;
   clearInterval(levelTimer);
   levelTimer = null;
@@ -263,9 +324,14 @@ function stop() {
   recorder = null;
 
   s?.getTracks().forEach((t) => t.stop());
+  mic?.getTracks().forEach((t) => t.stop());
   try { ctx?.close(); } catch {}
   ctx = null;
-  source = null;
+  tabSource = null;
+  micSource = null;
+  merger = null;
+  mixDest = null;
+  analyser = null;
 
   // Close the offscreen document so it doesn't leak across sessions.
   chrome.offscreen?.closeDocument?.().catch(() => {});

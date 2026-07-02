@@ -11,6 +11,7 @@
 @keyframes mn-in { from { opacity: 0; transform: translateY(10px) scale(.98); } to { opacity: 1; transform: none; } }
 #meetnotes-panel.mn-collapsed { max-height: none; }
 #meetnotes-panel.mn-collapsed .mn-body,
+#meetnotes-panel.mn-collapsed .mn-mic-warn,
 #meetnotes-panel.mn-collapsed .mn-interim { display: none; }
 
 .mn-head {
@@ -28,6 +29,19 @@
 .mn-btn { background: rgba(255,255,255,.18); border: none; color: #fff; width: 26px; height: 26px;
   border-radius: 8px; cursor: pointer; font-size: 16px; line-height: 1; transition: background .15s; }
 .mn-btn:hover { background: rgba(255,255,255,.32); }
+
+.mn-mic-warn { display: flex; align-items: center; flex-wrap: wrap; gap: 6px;
+  padding: 8px 12px; font-size: 11.5px; line-height: 1.4; color: #fcd9a0;
+  background: rgba(251,191,36,0.10); border-bottom: 1px solid rgba(251,191,36,0.25); }
+.mn-mic-warn[hidden] { display: none; }
+.mn-mic-warn span { flex: 1; min-width: 160px; }
+.mn-mic-fix { background: rgba(251,191,36,0.18); border: 1px solid rgba(251,191,36,0.4);
+  color: #fcd9a0; font-size: 10.5px; font-weight: 700; padding: 3px 8px; border-radius: 999px;
+  cursor: pointer; transition: background .15s; }
+.mn-mic-fix:hover { background: rgba(251,191,36,0.32); }
+.mn-mic-dismiss { background: none; border: none; color: #9aa0b4; cursor: pointer;
+  font-size: 11px; padding: 2px 4px; border-radius: 6px; }
+.mn-mic-dismiss:hover { color: #e8eaf2; }
 
 .mn-body { overflow-y: auto; padding: 12px 14px; scrollbar-width: thin; }
 .mn-body::-webkit-scrollbar { width: 6px; }

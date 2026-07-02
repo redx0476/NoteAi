@@ -3,7 +3,7 @@
   "name": "NOTEAI — AI Meeting Notes",
   "version": "1.0.0",
   "description": "Live transcription & AI notes for Google Meet and Microsoft Teams.",
-  "permissions": ["tabCapture", "offscreen", "storage", "activeTab", "scripting"],
+  "permissions": ["tabCapture", "offscreen", "storage", "activeTab", "scripting", "tabs"],
   "host_permissions": [
     "https://meet.google.com/*",
     "https://teams.microsoft.com/*",
@@ -25,6 +25,11 @@
       "js": ["config.js", "content/teams.js", "content/panel.js"],
       "css": ["content/panel.css"],
       "run_at": "document_idle"
+    },
+    {
+      "matches": ["http://localhost:3000/*"],
+      "js": ["content/sync-auth.js"],
+      "run_at": "document_start"
     }
   ],
   "web_accessible_resources": [

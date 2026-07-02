@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useEffect, useRef, useState } from 'react';
+import { Suspense, memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { api, auth, wsBase, fmtTime, fmtDate, durationMin, platformLabel, preferredModel, colorFor } from '@/lib/client/api';
@@ -123,15 +123,39 @@ function MeetingView() {
   const [m, setM] = useState(null);
   const [tab, setTab] = useState('summary');
   const [done, setDone] = useState(() => new Set());
+  const [tqInput, setTqInput] = useState('');
   const [tq, setTq] = useState('');
   const [interim, setInterim] = useState(null);
   const [showBulk, setShowBulk] = useState(false);
   const [editing, setEditing] = useState(null);
   const [recording, setRecording] = useState(false);
+  const [summarizing, setSummarizing] = useState(false);
+  const [reconnecting, setReconnecting] = useState(false);
   const socketRef = useRef(null);
   const recorderRef = useRef(null);
   const scrollRef = useRef(null);
   const audioRef = useRef(null);
+  const segsRef = useRef([]);
+  const summarizingRef = useRef(false);
+  const lastSummarizedCountRef = useRef(0);
+  const liveConnRef = useRef({ timer: null, attempts: 0, stopped: true });
+
+  // Debounce the transcript search so typing doesn't re-filter a potentially
+  // huge segment list on every keystroke.
+  useEffect(() => {
+    const t = setTimeout(() => setTq(tqInput), 250);
+    return () => clearTimeout(t);
+  }, [tqInput]);
+
+  const speakers = useMemo(
+    () => [...new Set((m?.segments || []).map((s) => s.speaker))],
+    [m?.segments]
+  );
+  const segs = useMemo(() => {
+    const list = m?.segments || [];
+    const q = tq.trim().toLowerCase();
+    return q ? list.filter((s) => s.text.toLowerCase().includes(q)) : list;
+  }, [m?.segments, tq]);
 
   async function reload() {
     const data = await api(`/api/meetings/${id}`);
@@ -149,37 +173,114 @@ function MeetingView() {
       }
     });
     return () => {
-      socketRef.current?.close();
+      disconnectLive();
       recorderRef.current?.stop();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
-  function connectLive() {
-    const url = `${wsBase()}/ws/live?meetingId=${encodeURIComponent(id)}&token=${encodeURIComponent(auth.token())}`;
-    const ws = new WebSocket(url);
-    socketRef.current = ws;
-    ws.onmessage = (ev) => {
-      let msg;
+  // Keep the latest segment list reachable from the polling interval below.
+  useEffect(() => {
+    segsRef.current = m?.segments || [];
+  }, [m]);
+
+  // While the meeting is live, regenerate the AI notes periodically so the
+  // Summary tab builds up as the call goes — without ending the meeting.
+  useEffect(() => {
+    if (m?.status !== 'live') return;
+    const tick = async () => {
+      const count = segsRef.current.length;
+      if (!count || count <= lastSummarizedCountRef.current || summarizingRef.current) return;
+      const prevCount = lastSummarizedCountRef.current;
+      lastSummarizedCountRef.current = count;
+      summarizingRef.current = true;
+      setSummarizing(true);
       try {
-        msg = JSON.parse(ev.data);
-      } catch {
-        return;
-      }
-      if (msg.type === 'interim') setInterim(msg);
-      else if (msg.type === 'final') {
-        setInterim(null);
+        const data = await api(`/api/meetings/${id}/live-summary`, { model: preferredModel() });
         setM((prev) =>
           prev
-            ? { ...prev, segments: [...(prev.segments || []), { speaker: msg.speaker, text: msg.text, tOffset: msg.tOffset }] }
+            ? {
+                ...prev,
+                title: data.title,
+                summary: data.summary,
+                actionItems: data.actionItems,
+                chapters: data.chapters,
+                keywords: data.keywords,
+              }
             : prev
         );
-        requestAnimationFrame(() => {
-          const el = scrollRef.current;
-          if (el) el.scrollTop = el.scrollHeight;
-        });
+      } catch {
+        lastSummarizedCountRef.current = prevCount; // let the next tick retry
+      } finally {
+        summarizingRef.current = false;
+        setSummarizing(false);
       }
     };
+    const iv = setInterval(tick, 45000);
+    return () => clearInterval(iv);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [m?.status, id]);
+
+  function connectLive() {
+    const conn = liveConnRef.current;
+    conn.stopped = false;
+    conn.attempts = 0;
+
+    const open = () => {
+      const url = `${wsBase()}/ws/live?meetingId=${encodeURIComponent(id)}&token=${encodeURIComponent(auth.token())}`;
+      const ws = new WebSocket(url);
+      socketRef.current = ws;
+      ws.onopen = () => {
+        const wasReconnect = conn.attempts > 0;
+        conn.attempts = 0;
+        setReconnecting(false);
+        // Backfill any final segments broadcast while the socket was down.
+        if (wasReconnect) reload().catch(() => {});
+      };
+      ws.onmessage = (ev) => {
+        let msg;
+        try {
+          msg = JSON.parse(ev.data);
+        } catch {
+          return;
+        }
+        if (msg.type === 'interim') setInterim(msg);
+        else if (msg.type === 'final') {
+          setInterim(null);
+          setM((prev) =>
+            prev
+              ? { ...prev, segments: [...(prev.segments || []), { speaker: msg.speaker, text: msg.text, tOffset: msg.tOffset }] }
+              : prev
+          );
+          requestAnimationFrame(() => {
+            const el = scrollRef.current;
+            if (el) el.scrollTop = el.scrollHeight;
+          });
+        }
+      };
+      // Auto-reconnect with capped exponential backoff so captions survive
+      // network blips / dev-server restarts. onerror is followed by onclose,
+      // so retrying from onclose alone covers both.
+      ws.onclose = () => {
+        if (conn.stopped) return;
+        setReconnecting(true);
+        const delay = Math.min(15000, 1000 * 2 ** conn.attempts++);
+        conn.timer = setTimeout(open, delay);
+      };
+    };
+    open();
+  }
+
+  function disconnectLive() {
+    const conn = liveConnRef.current;
+    conn.stopped = true;
+    clearTimeout(conn.timer);
+    setReconnecting(false);
+    if (socketRef.current) {
+      socketRef.current.onclose = null;
+      socketRef.current.close();
+      socketRef.current = null;
+    }
   }
 
   async function startRecording() {
@@ -212,16 +313,16 @@ function MeetingView() {
 
   async function endMeeting() {
     stopRecording();
-    socketRef.current?.close();
+    disconnectLive();
     toast('Generating summary…');
-    await api(`/api/meetings/${id}/end`, { model: preferredModel() });
-    await reload();
+    const data = await api(`/api/meetings/${id}/end`, { model: preferredModel() });
+    setM(data);
     toast('Notes ready ✓');
   }
   async function del() {
     if (!confirm('Delete this meeting?')) return;
     stopRecording();
-    socketRef.current?.close();
+    disconnectLive();
     await api(`/api/meetings/${id}`, null, 'DELETE');
     router.push('/app');
   }
@@ -234,37 +335,59 @@ function MeetingView() {
     navigator.clipboard.writeText(location.href);
     toast('Link copied');
   }
-  async function saveHighlight(s) {
-    await api(`/api/meetings/${id}/highlights`, { text: s.text, speaker: s.speaker, tOffset: s.tOffset });
-    toast('Highlight saved ⭐');
-    reload();
-  }
-  function startEdit(key, from) {
-    setEditing({ key, from, value: from });
-  }
-  function cancelEdit() {
-    setEditing(null);
-  }
-  async function saveSpeakerName(from, rawTo) {
-    const to = (rawTo || '').trim();
-    setEditing(null);
-    if (!to || to === from) return;
-    await api(`/api/meetings/${id}/speakers`, { from, to });
-    toast('Speaker renamed ✓');
-    reload();
-  }
-  function seekTo(t) {
+  // Mutation handlers patch state locally (the POST responses / server effects
+  // are mirrored) instead of reload()ing the whole meeting — which refetches
+  // the entire transcript. useCallback keeps them stable for SegmentRow's memo.
+  const saveHighlight = useCallback(
+    async (s) => {
+      const h = await api(`/api/meetings/${id}/highlights`, { text: s.text, speaker: s.speaker, tOffset: s.tOffset });
+      setM((prev) =>
+        prev
+          ? {
+              ...prev,
+              highlights: [...(prev.highlights || []), h].sort(
+                (a, b) => a.tOffset - b.tOffset || a.id - b.id
+              ),
+            }
+          : prev
+      );
+      toast('Highlight saved ⭐');
+    },
+    [id, toast]
+  );
+  const startEdit = useCallback((key, from) => setEditing({ key, from, value: from }), []);
+  const cancelEdit = useCallback(() => setEditing(null), []);
+  const onEditChange = useCallback((v) => setEditing((e) => (e ? { ...e, value: v } : e)), []);
+  const saveSpeakerName = useCallback(
+    async (from, rawTo) => {
+      const to = (rawTo || '').trim();
+      setEditing(null);
+      if (!to || to === from) return;
+      await api(`/api/meetings/${id}/speakers`, { from, to });
+      // Server renames the speaker on segments + highlights; mirror it locally.
+      setM((prev) =>
+        prev
+          ? {
+              ...prev,
+              segments: (prev.segments || []).map((s) => (s.speaker === from ? { ...s, speaker: to } : s)),
+              highlights: (prev.highlights || []).map((h) => (h.speaker === from ? { ...h, speaker: to } : h)),
+            }
+          : prev
+      );
+      toast('Speaker renamed ✓');
+    },
+    [id, toast]
+  );
+  const seekTo = useCallback((t) => {
     const a = audioRef.current;
     if (!a) return;
     a.currentTime = Math.max(0, t || 0);
     a.play().catch(() => {});
-  }
+  }, []);
 
   if (!m) return <div className="h-full grid place-items-center text-slate-400">Loading…</div>;
 
   const isLive = m.status === 'live';
-  const speakers = [...new Set((m.segments || []).map((s) => s.speaker))];
-  const segs = (m.segments || []).filter((s) => !tq || s.text.toLowerCase().includes(tq.toLowerCase()));
 
   return (
     <div className="h-full flex flex-col">
@@ -277,6 +400,11 @@ function MeetingView() {
               {isLive && (
                 <span className="chip bg-red-50 text-red-500">
                   <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" /> LIVE
+                </span>
+              )}
+              {isLive && reconnecting && (
+                <span className="chip bg-amber-50 text-amber-600">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" /> reconnecting…
                 </span>
               )}
               {recording && (
@@ -349,9 +477,19 @@ function MeetingView() {
                 </div>
               )}
 
-              <Section title="Overview" icon="🧠">
+              <Section
+                title="Overview"
+                icon="🧠"
+                right={
+                  isLive && summarizing ? (
+                    <span className="text-xs text-slate-400 flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-brand animate-pulse" /> updating…
+                    </span>
+                  ) : null
+                }
+              >
                 <div className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
-                  {m.summary || (isLive ? 'Summary is generated when you end the meeting.' : 'No summary yet.')}
+                  {m.summary || (isLive ? 'Building summary as the meeting goes…' : 'No summary yet.')}
                 </div>
               </Section>
 
@@ -506,8 +644,8 @@ function MeetingView() {
               <div className="relative no-print">
                 <IconSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" width={16} height={16} />
                 <input
-                  value={tq}
-                  onChange={(e) => setTq(e.target.value)}
+                  value={tqInput}
+                  onChange={(e) => setTqInput(e.target.value)}
                   placeholder="Find in transcript…"
                   className="input pl-9"
                 />
@@ -516,49 +654,19 @@ function MeetingView() {
               <div className="space-y-1">
                 {segs.length ? (
                   segs.map((s, i) => (
-                    <div key={i} className="group flex gap-3 rounded-lg px-2 py-2 hover:bg-slate-50 dark:hover:bg-slate-800/60">
-                      <Avatar name={s.speaker} size={30} />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-baseline gap-2">
-                          {editing?.key === `seg:${i}` ? (
-                            <SpeakerNameInput
-                              attendees={m.participants}
-                              value={editing.value}
-                              onChange={(v) => setEditing((e) => ({ ...e, value: v }))}
-                              onSave={() => saveSpeakerName(s.speaker, editing.value)}
-                              onCancel={cancelEdit}
-                            />
-                          ) : (
-                            <span className="flex items-center gap-1">
-                              <span
-                                className="text-sm font-semibold"
-                                style={{ color: colorFor(s.speaker) }}
-                              >
-                                {s.speaker}
-                              </span>
-                              <button
-                                onClick={() => startEdit(`seg:${i}`, s.speaker)}
-                                className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-brand no-print"
-                                title="Rename speaker"
-                              >
-                                <IconPencil width={13} height={13} />
-                              </button>
-                            </span>
-                          )}
-                          <button onClick={() => seekTo(s.tOffset)} className="text-xs text-slate-400 tabular-nums hover:text-brand">
-                            {fmtTime(s.tOffset)}
-                          </button>
-                        </div>
-                        <p className="text-sm text-slate-700 leading-relaxed">{s.text}</p>
-                      </div>
-                      <button
-                        onClick={() => saveHighlight(s)}
-                        className="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-amber-400 no-print"
-                        title="Save highlight"
-                      >
-                        <IconStar width={16} height={16} />
-                      </button>
-                    </div>
+                    <SegmentRow
+                      key={i}
+                      s={s}
+                      i={i}
+                      editing={editing?.key === `seg:${i}` ? editing : null}
+                      attendees={m.participants}
+                      onStartEdit={startEdit}
+                      onEditChange={onEditChange}
+                      onSaveSpeaker={saveSpeakerName}
+                      onCancelEdit={cancelEdit}
+                      onSeek={seekTo}
+                      onHighlight={saveHighlight}
+                    />
                   ))
                 ) : (
                   <p className="text-sm text-slate-400">
@@ -584,6 +692,65 @@ function MeetingView() {
     </div>
   );
 }
+
+// One transcript line. Memoized so a new live caption only mounts one new row
+// instead of re-rendering the entire (potentially huge) transcript. All
+// callbacks passed in are stable (useCallback in MeetingView).
+const SegmentRow = memo(function SegmentRow({
+  s,
+  i,
+  editing,
+  attendees,
+  onStartEdit,
+  onEditChange,
+  onSaveSpeaker,
+  onCancelEdit,
+  onSeek,
+  onHighlight,
+}) {
+  return (
+    <div className="group flex gap-3 rounded-lg px-2 py-2 hover:bg-slate-50 dark:hover:bg-slate-800/60">
+      <Avatar name={s.speaker} size={30} />
+      <div className="flex-1 min-w-0">
+        <div className="flex items-baseline gap-2">
+          {editing ? (
+            <SpeakerNameInput
+              attendees={attendees}
+              value={editing.value}
+              onChange={onEditChange}
+              onSave={() => onSaveSpeaker(s.speaker, editing.value)}
+              onCancel={onCancelEdit}
+            />
+          ) : (
+            <span className="flex items-center gap-1">
+              <span className="text-sm font-semibold" style={{ color: colorFor(s.speaker) }}>
+                {s.speaker}
+              </span>
+              <button
+                onClick={() => onStartEdit(`seg:${i}`, s.speaker)}
+                className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-brand no-print"
+                title="Rename speaker"
+              >
+                <IconPencil width={13} height={13} />
+              </button>
+            </span>
+          )}
+          <button onClick={() => onSeek(s.tOffset)} className="text-xs text-slate-400 tabular-nums hover:text-brand">
+            {fmtTime(s.tOffset)}
+          </button>
+        </div>
+        <p className="text-sm text-slate-700 leading-relaxed">{s.text}</p>
+      </div>
+      <button
+        onClick={() => onHighlight(s)}
+        className="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-amber-400 no-print"
+        title="Save highlight"
+      >
+        <IconStar width={16} height={16} />
+      </button>
+    </div>
+  );
+});
 
 function SpeakerNameInput({ value, onChange, onSave, onCancel, attendees }) {
   return (

@@ -1,4 +1,4 @@
-import { pool } from '@/lib/db';
+import { withTransaction } from '@/lib/db';
 import { getUserFromRequest } from '@/lib/auth';
 import { ownsMeeting } from '@/lib/meetings';
 
@@ -14,11 +14,13 @@ export async function POST(request, { params }) {
 
   const body = (await request.json().catch(() => ({}))) || {};
   const map = body.map && typeof body.map === 'object' ? body.map : {};
-  for (const [from, to] of Object.entries(map)) {
-    const t = String(to).trim();
-    if (!from || !t || from === t) continue;
-    await pool.query('UPDATE segments SET speaker = $1 WHERE meeting_id = $2 AND speaker = $3', [t, params.id, from]);
-    await pool.query('UPDATE highlights SET speaker = $1 WHERE meeting_id = $2 AND speaker = $3', [t, params.id, from]);
-  }
+  await withTransaction(async (client) => {
+    for (const [from, to] of Object.entries(map)) {
+      const t = String(to).trim();
+      if (!from || !t || from === t) continue;
+      await client.query('UPDATE segments SET speaker = $1 WHERE meeting_id = $2 AND speaker = $3', [t, params.id, from]);
+      await client.query('UPDATE highlights SET speaker = $1 WHERE meeting_id = $2 AND speaker = $3', [t, params.id, from]);
+    }
+  });
   return Response.json({ ok: true });
 }

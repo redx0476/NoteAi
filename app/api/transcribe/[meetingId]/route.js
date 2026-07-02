@@ -25,7 +25,7 @@ export async function POST(request, { params }) {
     const buffer = Buffer.from(await file.arrayBuffer());
     const text = await transcribeChunk(buffer, file.type || 'audio/webm');
     if (text) {
-      const speaker = form.get('speaker') || 'Speaker';
+      const speaker = form.get('speaker') || 'Speaker 1';
       const tOffset = Number(form.get('tOffset') || 0);
       await pool.query(
         'INSERT INTO segments (meeting_id, speaker, text, t_offset) VALUES ($1, $2, $3, $4)',

@@ -1,12 +1,14 @@
 import { pool } from '@/lib/db';
 import { getUserFromRequest } from '@/lib/auth';
-import { getMeeting, fmtTs } from '@/lib/meetings';
+import { getMeeting } from '@/lib/meetings';
 import { summarizeMeeting } from '@/lib/services/llm';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
 
-// End the meeting and generate AI notes.
+// Refresh the AI notes for a meeting that is still in progress. Unlike
+// /end, this never changes the meeting status — the call stays 'live' so the
+// summary can be regenerated repeatedly as more of the transcript arrives.
 export async function POST(request, { params }) {
   const payload = getUserFromRequest(request);
   if (!payload) return Response.json({ error: 'Unauthorized' }, { status: 401 });
@@ -14,9 +16,8 @@ export async function POST(request, { params }) {
   const meeting = await getMeeting(params.id, payload.uid);
   if (!meeting) return Response.json({ error: 'Not found' }, { status: 404 });
 
-  // Idempotent: concurrent stop triggers (popup Stop + tab close) both land
-  // here — only the first one runs the LLM; the rest get the finished meeting.
-  if (meeting.status !== 'live') return Response.json(meeting);
+  // Nothing to summarize yet — return the meeting unchanged (skip the LLM call).
+  if (!meeting.segments?.length) return Response.json(meeting);
 
   const model = (await request.json().catch(() => ({})))?.model;
 
@@ -27,11 +28,10 @@ export async function POST(request, { params }) {
     );
     const { rows } = await pool.query(
       `UPDATE meetings
-         SET status = 'ended', ended_at = now(),
-             title = CASE WHEN $1 <> '' AND $1 <> 'Untitled meeting' THEN $1 ELSE title END,
+         SET title = CASE WHEN $1 <> '' AND $1 <> 'Untitled meeting' THEN $1 ELSE title END,
              summary = $2, action_items = $3, chapters = $4, keywords = $5
        WHERE id = $6
-       RETURNING title, ended_at`,
+       RETURNING title`,
       [
         title,
         summary,
@@ -41,20 +41,10 @@ export async function POST(request, { params }) {
         meeting.id,
       ]
     );
-    // Merge the updates into the meeting we already fetched instead of
-    // re-reading the whole transcript.
-    return Response.json({
-      ...meeting,
-      status: 'ended',
-      title: rows[0].title,
-      endedAt: fmtTs(rows[0].ended_at),
-      summary,
-      actionItems,
-      chapters,
-      keywords,
-    });
+    // Merge into the meeting fetched above — no second full-transcript read.
+    return Response.json({ ...meeting, title: rows[0].title, summary, actionItems, chapters, keywords });
   } catch (err) {
-    await pool.query(`UPDATE meetings SET status = 'ended', ended_at = now() WHERE id = $1`, [meeting.id]);
+    // Leave the meeting live and untouched so the next interval can retry.
     return Response.json({ error: 'Notes generation failed', detail: String(err.message) }, { status: 502 });
   }
 }

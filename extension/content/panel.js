@@ -13,6 +13,11 @@
         <button class="mn-btn mn-min" title="Minimize">–</button>
       </div>
     </div>
+    <div class="mn-mic-warn" hidden>
+      <span>🎙️ Your mic isn't being captured — only meeting audio is transcribed.</span>
+      <button class="mn-mic-fix">Enable for next recording</button>
+      <button class="mn-mic-dismiss" title="Dismiss">✕</button>
+    </div>
     <div class="mn-body">
       <div class="mn-empty">Live transcript will appear here once you start notes.</div>
     </div>
@@ -24,6 +29,15 @@
   const interimEl = panel.querySelector('.mn-interim');
   panel.querySelector('.mn-min').addEventListener('click', () => panel.classList.toggle('mn-collapsed'));
 
+  // Mic-denied warning. Granting can't hot-attach the mic to a capture that is
+  // already running, so the fix button only sets things up for the next one.
+  const micWarn = panel.querySelector('.mn-mic-warn');
+  panel.querySelector('.mn-mic-fix').addEventListener('click', () => {
+    chrome.runtime.sendMessage({ type: 'REQUEST_MIC_PERMISSION' }).catch(() => {});
+    micWarn.hidden = true;
+  });
+  panel.querySelector('.mn-mic-dismiss').addEventListener('click', () => (micWarn.hidden = true));
+
   // Stable per-speaker accent colours.
   const palette = ['#8e7bff', '#22d3ee', '#f472b6', '#34d399', '#fbbf24', '#fb7185', '#a78bfa', '#60a5fa'];
   const speakerColors = new Map();
@@ -33,8 +47,14 @@
   }
 
   let lastSpeaker = null;
+  const MAX_LINES = 300; // keep the live panel bounded on long meetings
 
   chrome.runtime.onMessage.addListener((msg) => {
+    if (msg.type === 'MIC_STATUS' && msg.ok === false) {
+      if (msg.message) micWarn.querySelector('span').textContent = `🎙️ ${msg.message}`;
+      micWarn.hidden = false;
+      return;
+    }
     if (msg.type !== 'LIVE_SEGMENT' || !msg.text) return;
     const empty = body.querySelector('.mn-empty');
     if (empty) empty.remove();
@@ -69,6 +89,11 @@
       e.target.textContent = '★';
     });
     body.appendChild(line);
+    // Cap the panel to the most recent lines so multi-hour meetings don't grow
+    // the meeting tab's DOM without bound (the full transcript lives on the
+    // dashboard anyway).
+    const lines = body.querySelectorAll('.mn-line');
+    for (let i = 0; i < lines.length - MAX_LINES; i++) lines[i].remove();
     body.scrollTop = body.scrollHeight;
   });
 

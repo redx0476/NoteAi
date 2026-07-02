@@ -1,4 +1,4 @@
-import { pool } from '@/lib/db';
+import { withTransaction } from '@/lib/db';
 import { getUserFromRequest } from '@/lib/auth';
 import { getMeeting, ownsMeeting } from '@/lib/meetings';
 import { deleteRecording } from '@/lib/audio';
@@ -20,9 +20,11 @@ export async function DELETE(request, { params }) {
   if (!(await ownsMeeting(params.id, payload.uid))) {
     return Response.json({ error: 'Not found' }, { status: 404 });
   }
-  await pool.query('DELETE FROM highlights WHERE meeting_id = $1', [params.id]);
-  await pool.query('DELETE FROM segments WHERE meeting_id = $1', [params.id]);
-  await pool.query('DELETE FROM meetings WHERE id = $1', [params.id]);
+  await withTransaction(async (client) => {
+    await client.query('DELETE FROM highlights WHERE meeting_id = $1', [params.id]);
+    await client.query('DELETE FROM segments WHERE meeting_id = $1', [params.id]);
+    await client.query('DELETE FROM meetings WHERE id = $1', [params.id]);
+  });
   deleteRecording(params.id);
   return Response.json({ ok: true });
 }
