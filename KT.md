@@ -386,7 +386,65 @@ Introspection: `GET /api/health` → `{ ok: true }`; `GET /api/config` →
 
 ---
 
-## 12. First tasks checklist for a new engineer
+## 12. Notetaker bot, calendar auto-join, S3 storage
+
+### Notetaker bot (`bot/`, `lib/bots/`)
+
+A Playwright Chromium child process per meeting, spawned from the custom
+server (single-instance, no queue system). `bot_jobs` is the source of truth.
+
+- `lib/bots/manager.js` — spawns `node bot/runner.js --job <id>` with a
+  service JWT (`signServiceToken` in `lib/auth.js`, same `JWT_SECRET`, carries
+  the owner's `uid` so every existing auth check just works) in `BOT_TOKEN`.
+  Caps concurrency (`BOT_MAX_CONCURRENT`), reaps orphans on boot
+  (`reconcile()`), kills overdue bots (`killOverdue()`).
+- `lib/bots/scheduler.js` — 30 s tick promoting due `scheduled` jobs.
+- `bot/runner.js` — creates the meeting via `POST /api/meetings`, joins via
+  `bot/platforms/{meet,teams}.js` (selectors ported from the extension content
+  scripts), streams PCM to `/ws/ingest`, scrapes the roster every 20 s, ends
+  via `POST /api/meetings/:id/end`. Also has `--spike <url>` mode to verify
+  headless audio capture (logs RMS).
+- `bot/capture.js` — page-injected WebAudio tap: patches `RTCPeerConnection`
+  (+ `<audio srcObject>` sweep), mixes remote tracks, downsamples 48 k→16 k
+  Int16, and interleaves a **silent channel 0** with the meeting mix on
+  channel 1 — matching the ingest pipeline's 2-channel contract (ch0 = "You")
+  without any server changes. Do not convert this to mono.
+- Status flow: `scheduled → pending → joining → waiting_admission → recording
+  → ended` (or `failed` / `skipped`). Failure screenshots: `data/bot/<jobId>.png`.
+- Routes: `app/api/bots/route.js` (send/list), `app/api/bots/[id]/route.js`
+  (status/remove). UI: BotBar on `app/app/page.jsx`, notetaker chip on the
+  meeting page.
+
+### Channel-count plumbing (fixed quirk)
+
+`/ws/ingest` now accepts `?channels=1|2` (default 2). The web mic recorder
+sends `channels=1` (it always streamed mono — previously mislabeled as stereo
+to Deepgram); extension/bot stream interleaved stereo. `lib/audio.js` persists
+the count in `<id>.meta.json` and writes a matching WAV header.
+
+### Google Calendar auto-join (`lib/calendar/`)
+
+- `lib/calendar/google.js` — OAuth2 (`calendar.readonly` + email scopes,
+  offline access), token refresh persisted to `calendar_accounts`.
+- `lib/calendar/sync.js` — 5 min poller: next-24 h events → extract Meet/Teams
+  links (`conferenceData` → `location` → `description`) → upsert `scheduled`
+  `bot_jobs` keyed by `(user_id, calendar_event_id)`; never resurrects
+  `skipped`/terminal rows; prunes vanished events; skips declined invites.
+- Routes under `app/api/integrations/google/*`: `auth` (consent URL, state =
+  signed JWT), `callback`, status/autopilot/disconnect, `events` (list +
+  per-event toggle). UI: `app/app/integrations/page.jsx`.
+
+### S3 storage (`lib/storage.js`)
+
+Enabled by `S3_BUCKET`. Live PCM still appends locally; `finalizeRecording()`
+(called from ingest close + `/end`) uploads the WAV and sets
+`meetings.audio_object_key`. Playback 302s to a presigned URL (`S3_PROXY=1`
+streams through the server for private MinIO). Imports upload directly.
+Delete removes the S3 object. Unset `S3_BUCKET` → exact pre-S3 behavior.
+
+---
+
+## 13. First tasks checklist for a new engineer
 
 1. Install Node 20, Postgres; `npm install`; `cp .env.example .env` and set
    `JWT_SECRET` + `DATABASE_URL`.

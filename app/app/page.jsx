@@ -25,6 +25,113 @@ function Snippet({ text }) {
   );
 }
 
+const BOT_STATUS_LABEL = {
+  pending: 'Starting…',
+  scheduled: 'Scheduled',
+  joining: 'Joining…',
+  waiting_admission: 'Waiting to be admitted',
+  recording: 'Recording',
+};
+
+function BotBar({ onMeetingReady }) {
+  const [url, setUrl] = useState('');
+  const [sending, setSending] = useState(false);
+  const [jobs, setJobs] = useState([]);
+  const toast = useToast();
+
+  async function refresh() {
+    try {
+      setJobs(await api('/api/bots?active=1'));
+    } catch {
+      /* ignore — next poll retries */
+    }
+  }
+
+  useEffect(() => {
+    refresh();
+    const t = setInterval(refresh, 10000);
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function send() {
+    const link = url.trim();
+    if (!link) return;
+    setSending(true);
+    try {
+      await api('/api/bots', { meetingUrl: link });
+      setUrl('');
+      toast('Notetaker is on its way — admit it from the meeting');
+      refresh();
+    } catch (err) {
+      toast(err.message);
+    } finally {
+      setSending(false);
+    }
+  }
+
+  async function stop(job) {
+    try {
+      await api(`/api/bots/${job.id}`, null, 'DELETE');
+      toast(job.status === 'scheduled' ? 'Auto-join cancelled' : 'Notetaker is leaving');
+      refresh();
+      if (job.meetingId) onMeetingReady?.();
+    } catch (err) {
+      toast(err.message);
+    }
+  }
+
+  return (
+    <div className="mb-8">
+      <div className="card p-4">
+        <div className="flex items-center gap-3">
+          <input
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && send()}
+            placeholder="Paste a Google Meet or Teams link — the notetaker joins for you"
+            className="input flex-1 bg-slate-50 dark:bg-slate-800"
+          />
+          <button className="btn-primary shrink-0" onClick={send} disabled={sending || !url.trim()}>
+            {sending ? 'Sending…' : 'Send notetaker'}
+          </button>
+        </div>
+        {jobs.length > 0 && (
+          <div className="mt-3 space-y-2">
+            {jobs.map((j) => (
+              <div key={j.id} className="flex items-center gap-3 text-sm">
+                <span
+                  className={`chip ${
+                    j.status === 'recording'
+                      ? 'bg-red-50 text-red-500'
+                      : 'bg-slate-100 text-slate-500'
+                  }`}
+                >
+                  {j.status === 'recording' && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+                  )}
+                  {BOT_STATUS_LABEL[j.status] || j.status}
+                </span>
+                <span className="text-slate-500 truncate flex-1">
+                  {j.eventTitle || j.meetingUrl}
+                </span>
+                {j.meetingId && (
+                  <Link href={`/app/m/${j.meetingId}`} className="text-brand font-medium shrink-0">
+                    Open notes
+                  </Link>
+                )}
+                <button onClick={() => stop(j)} className="text-slate-400 hover:text-red-500 shrink-0">
+                  {j.status === 'scheduled' ? 'Cancel' : 'Remove'}
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function Home() {
   const [items, setItems] = useState([]);
   const [q, setQ] = useState('');
@@ -104,6 +211,7 @@ export default function Home() {
 
       <div className="flex-1 overflow-y-auto px-6 py-6">
         <div className="max-w-3xl mx-auto">
+          <BotBar onMeetingReady={() => load(q)} />
           {loading && <div className="text-slate-400 text-sm">Loading…</div>}
           {!loading && !items.length && (
             <div className="text-center py-24">

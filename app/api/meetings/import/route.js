@@ -49,7 +49,10 @@ export async function POST(request) {
       }
     }
 
-    saveImport(id, buffer, ext);
+    const objectKey = await saveImport(id, buffer, ext);
+    if (objectKey) {
+      await pool.query('UPDATE meetings SET audio_object_key = $1 WHERE id = $2', [objectKey, id]);
+    }
 
     const segments = utterances.map((u) => ({ speaker: u.speaker, text: u.text }));
     const notes = await summarizeMeeting(segments, model).catch(() => null);

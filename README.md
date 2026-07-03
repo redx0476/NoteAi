@@ -95,6 +95,17 @@ Copy `.env.example` → `.env` and fill in:
 | `STT_API_KEY` | no | — | Batch STT auth |
 | `STT_MODEL` | no | `whisper-1` | Batch STT model |
 | `STT_LANGUAGE` | no | — | Optional forced STT language |
+| `APP_URL` | no | `http://localhost:3000` | Public base URL (bot target + OAuth redirect base) |
+| `BOT_NAME` | no | `NoteAI Notetaker` | Display name the bot joins meetings with |
+| `BOT_HEADFUL` | no | `0` | `1` = headful Chromium (use with `xvfb-run` if headless audio is silent) |
+| `BOT_MAX_MINUTES` | no | `120` | Hard cap per bot meeting |
+| `BOT_ADMISSION_TIMEOUT_MIN` | no | `10` | Lobby wait before giving up |
+| `BOT_MAX_CONCURRENT` | no | `3` | Max simultaneous bot Chromiums |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | no | — | Enables Google Calendar auto-join |
+| `S3_BUCKET` | no | — | Enables S3 audio storage; empty → local `data/audio/` |
+| `S3_ENDPOINT` / `S3_REGION` / `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` | no | — | S3 credentials (`S3_ENDPOINT` e.g. MinIO) |
+| `S3_FORCE_PATH_STYLE` | no | `1` | Path-style URLs (required for MinIO) |
+| `S3_PROXY` | no | `0` | `1` = proxy audio through the server instead of presigned redirect |
 
 > Without `DEEPGRAM_API_KEY`, the app falls back to the **batch Whisper** path (`STT_*`). Without `OPENROUTER_API_KEY`, AI summaries/Q&A are unavailable but transcription still works.
 
@@ -127,7 +138,38 @@ graph LR
 3. If Deepgram is configured, interim/final transcripts are broadcast to dashboards on `/ws/live` and finals are persisted as `segments`. Raw PCM is always saved to `data/audio/<id>.pcm`.
 4. If Deepgram is unavailable, the server tells the client to fall back to batch mode (`POST /api/transcribe/:id`).
 5. On end (`POST /api/meetings/:id/end`), the transcript is sent to the LLM to generate the title, summary, action items, chapters, and keywords.
-6. Recorded audio is played back via `GET /api/meetings/:id/audio` (WAV wrapped lazily from PCM, with Range/seek support).
+6. Recorded audio is played back via `GET /api/meetings/:id/audio` (WAV wrapped lazily from PCM, with Range/seek support). With S3 configured, finished recordings are uploaded and playback redirects to a presigned URL.
+
+---
+
+## Notetaker bot (Meet & Teams)
+
+The bot is a Playwright Chromium that joins a meeting as a guest, taps the
+WebRTC audio in-page, and streams it into the same `/ws/ingest` pipeline the
+extension uses — so live captions, summaries, and playback all work unchanged.
+
+One-time setup:
+
+```bash
+npx playwright install --with-deps chromium
+```
+
+- **Send it manually**: paste a Meet/Teams link into the bar at the top of the home page. The bot appears in the lobby as `BOT_NAME` — admit it from the host account.
+- **Autopilot**: connect Google Calendar on `/app/integrations` (needs `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`, redirect URI `${APP_URL}/api/integrations/google/callback`). Events with Meet/Teams links get a scheduled bot job; per-event toggles + a global autopilot switch live on the same page.
+- **Spike/debug**: `node bot/runner.js --spike <meet-url>` joins a call standalone and logs capture RMS every 5 s — use this to confirm headless audio capture works in your environment. If RMS stays near zero, set `BOT_HEADFUL=1` and run under `xvfb-run`.
+- Bot state machine (`bot_jobs.status`): `scheduled → pending → joining → waiting_admission → recording → ended` (or `failed`/`skipped`). On failure a screenshot is saved to `data/bot/<jobId>.png`.
+- The bot leaves on its own when the meeting ends, when it's alone for 5 min, when removed via the UI, or at `BOT_MAX_MINUTES`.
+
+## S3 audio storage (optional)
+
+Set the `S3_*` vars to store finished recordings in any S3-compatible bucket
+(AWS S3, MinIO, …). Live PCM still appends to local disk during recording; the
+WAV is uploaded when the meeting ends. Quick local MinIO:
+
+```bash
+docker run -p 9000:9000 -p 9001:9001 minio/minio server /data --console-address :9001
+# then: S3_ENDPOINT=http://localhost:9000 S3_BUCKET=noteai S3_ACCESS_KEY_ID=minioadmin S3_SECRET_ACCESS_KEY=minioadmin
+```
 
 ---
 

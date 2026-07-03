@@ -2,6 +2,7 @@ import { pool } from '@/lib/db';
 import { getUserFromRequest } from '@/lib/auth';
 import { getMeeting, fmtTs } from '@/lib/meetings';
 import { summarizeMeeting } from '@/lib/services/llm';
+import { finalizeRecording } from '@/lib/audio';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
@@ -19,6 +20,12 @@ export async function POST(request, { params }) {
   if (meeting.status !== 'live') return Response.json(meeting);
 
   const model = (await request.json().catch(() => ({})))?.model;
+
+  // Authoritative S3 upload point — the ingest socket may already have
+  // finalized on close, but this covers batch-only recordings too.
+  finalizeRecording(meeting.id).catch((err) =>
+    console.error('end: failed to finalize recording:', err.message)
+  );
 
   try {
     const { title, summary, actionItems, chapters, keywords } = await summarizeMeeting(

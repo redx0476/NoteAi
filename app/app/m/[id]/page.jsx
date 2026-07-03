@@ -131,6 +131,7 @@ function MeetingView() {
   const [recording, setRecording] = useState(false);
   const [summarizing, setSummarizing] = useState(false);
   const [reconnecting, setReconnecting] = useState(false);
+  const [botJob, setBotJob] = useState(null); // live notetaker bot in this meeting
   const socketRef = useRef(null);
   const recorderRef = useRef(null);
   const scrollRef = useRef(null);
@@ -183,6 +184,40 @@ function MeetingView() {
   useEffect(() => {
     segsRef.current = m?.segments || [];
   }, [m]);
+
+  // Track whether a notetaker bot is in this meeting (chip + Remove button).
+  useEffect(() => {
+    if (m?.status !== 'live') {
+      setBotJob(null);
+      return;
+    }
+    let cancelled = false;
+    const poll = async () => {
+      try {
+        const jobs = await api('/api/bots?active=1');
+        if (!cancelled) setBotJob(jobs.find((j) => j.meetingId === id) || null);
+      } catch {
+        /* next poll retries */
+      }
+    };
+    poll();
+    const t = setInterval(poll, 10000);
+    return () => {
+      cancelled = true;
+      clearInterval(t);
+    };
+  }, [m?.status, id]);
+
+  async function removeBot() {
+    if (!botJob) return;
+    try {
+      await api(`/api/bots/${botJob.id}`, null, 'DELETE');
+      toast('Notetaker is leaving the meeting');
+      setBotJob(null);
+    } catch (err) {
+      toast(err.message);
+    }
+  }
 
   // While the meeting is live, regenerate the AI notes periodically so the
   // Summary tab builds up as the call goes — without ending the meeting.
@@ -410,6 +445,19 @@ function MeetingView() {
               {recording && (
                 <span className="chip bg-emerald-50 text-emerald-600">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> REC
+                </span>
+              )}
+              {botJob && (
+                <span className="chip bg-brand-soft text-brand" title={`Bot status: ${botJob.status}`}>
+                  <span className="w-1.5 h-1.5 rounded-full bg-brand animate-pulse" />
+                  Notetaker {botJob.status === 'recording' ? 'in call' : 'joining…'}
+                  <button
+                    onClick={removeBot}
+                    className="ml-1 font-medium hover:text-red-500"
+                    title="Remove the notetaker from this meeting"
+                  >
+                    ✕
+                  </button>
                 </span>
               )}
             </h1>

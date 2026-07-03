@@ -1,18 +1,47 @@
 import fs from 'fs';
 import { Readable } from 'stream';
+import { pool } from '@/lib/db';
 import { getUserFromRequest } from '@/lib/auth';
 import { ownsMeeting } from '@/lib/meetings';
 import { ensureWav, importFile } from '@/lib/audio';
+import { s3Enabled, presignGet, getObjectStream } from '@/lib/storage';
 
 export const dynamic = 'force-dynamic';
 
 // Audio playback. Authenticates via Bearer header OR ?token= (an <audio>
 // element can't send headers). Supports HTTP Range requests for seeking.
+//
+// When the recording lives in S3 we redirect to a presigned URL (S3 handles
+// Range natively). Set S3_PROXY=1 to stream through the server instead — for
+// setups where the S3 endpoint (e.g. private MinIO) isn't browser-reachable.
 export async function GET(request, { params }) {
   const payload = getUserFromRequest(request);
   if (!payload) return Response.json({ error: 'Unauthorized' }, { status: 401 });
   if (!(await ownsMeeting(params.id, payload.uid))) {
     return Response.json({ error: 'Not found' }, { status: 404 });
+  }
+
+  if (s3Enabled()) {
+    const { rows } = await pool.query('SELECT audio_object_key FROM meetings WHERE id = $1', [
+      params.id,
+    ]);
+    const key = rows[0]?.audio_object_key;
+    if (key) {
+      if (process.env.S3_PROXY === '1') {
+        const range = request.headers.get('range') || undefined;
+        const obj = await getObjectStream(key, range);
+        const headers = {
+          'Content-Type': obj.contentType || 'audio/wav',
+          'Accept-Ranges': 'bytes',
+          'Cache-Control': 'no-store',
+        };
+        if (obj.contentLength != null) headers['Content-Length'] = String(obj.contentLength);
+        if (obj.contentRange) headers['Content-Range'] = obj.contentRange;
+        return new Response(Readable.toWeb(obj.body), { status: range ? 206 : 200, headers });
+      }
+      return Response.redirect(await presignGet(key), 302);
+    }
+    // No uploaded object yet (e.g. meeting still live) → fall through to disk.
   }
 
   let filePath;

@@ -11,6 +11,9 @@ const { createServer } = require('http');
 const next = require('next');
 const { initDb } = require('./lib/initDb');
 const { attachWebSocket } = require('./lib/ws');
+const botManager = require('./lib/bots/manager');
+const { startScheduler } = require('./lib/bots/scheduler');
+const { startCalendarPoller } = require('./lib/calendar/sync');
 
 const dev = process.env.NODE_ENV !== 'production';
 const port = parseInt(process.env.PORT || '3000', 10);
@@ -24,6 +27,12 @@ async function main() {
 
   const server = createServer((req, res) => handle(req, res));
   attachWebSocket(server);
+
+  // Notetaker bots: reap jobs orphaned by a previous process, then start the
+  // dispatch loop and the calendar auto-join poller.
+  await botManager.reconcile();
+  startScheduler();
+  startCalendarPoller();
 
   server.listen(port, () => {
     // eslint-disable-next-line no-console
