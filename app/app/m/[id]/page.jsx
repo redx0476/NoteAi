@@ -3,7 +3,7 @@
 import { Suspense, memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { api, auth, wsBase, fmtTime, fmtDate, durationMin, platformLabel, preferredModel, colorFor } from '@/lib/client/api';
+import { api, auth, wsBase, fmtTime, fmtDate, durationMin, platformLabel, preferredModel, MODELS, MODEL_RANKS, colorFor } from '@/lib/client/api';
 import { startMicIngest } from '@/lib/client/recorder';
 import Avatar from '@/components/Avatar';
 import { useToast } from '@/components/Toast';
@@ -132,6 +132,10 @@ function MeetingView() {
   const [summarizing, setSummarizing] = useState(false);
   const [reconnecting, setReconnecting] = useState(false);
   const [botJob, setBotJob] = useState(null); // live notetaker bot in this meeting
+  const [preview, setPreview] = useState(null); // regenerated notes awaiting Apply/Discard
+  const [regenBusy, setRegenBusy] = useState(false);
+  const [applying, setApplying] = useState(false);
+  const [regenModel, setRegenModel] = useState(preferredModel());
   const socketRef = useRef(null);
   const recorderRef = useRef(null);
   const scrollRef = useRef(null);
@@ -238,6 +242,7 @@ function MeetingView() {
                 ...prev,
                 title: data.title,
                 summary: data.summary,
+                objectives: data.objectives,
                 actionItems: data.actionItems,
                 chapters: data.chapters,
                 keywords: data.keywords,
@@ -353,6 +358,49 @@ function MeetingView() {
     const data = await api(`/api/meetings/${id}/end`, { model: preferredModel() });
     setM(data);
     toast('Notes ready ✓');
+  }
+  // Regenerate notes as a preview — nothing is saved until applyPreview().
+  async function regenerate() {
+    if (regenBusy) return;
+    setRegenBusy(true);
+    try {
+      const notes = await api(`/api/meetings/${id}/regenerate`, { model: regenModel });
+      setPreview(notes);
+    } catch (err) {
+      toast(err.message);
+    } finally {
+      setRegenBusy(false);
+    }
+  }
+  async function applyPreview() {
+    if (!preview || applying) return;
+    setApplying(true);
+    try {
+      const saved = await api(`/api/meetings/${id}/regenerate`, preview, 'PUT');
+      setM((prev) =>
+        prev
+          ? {
+              ...prev,
+              title: saved.title,
+              summary: saved.summary,
+              objectives: saved.objectives,
+              actionItems: saved.actionItems,
+              chapters: saved.chapters,
+              keywords: saved.keywords,
+            }
+          : prev
+      );
+      setDone(new Set()); // checkbox indices point at the old action items
+      setPreview(null);
+      toast('Notes updated ✓');
+    } catch (err) {
+      toast(err.message);
+    } finally {
+      setApplying(false);
+    }
+  }
+  function discardPreview() {
+    if (!applying) setPreview(null);
   }
   async function del() {
     if (!confirm('Delete this meeting?')) return;
@@ -483,6 +531,30 @@ function MeetingView() {
                 </button>
               </>
             )}
+            {!isLive && (
+              <>
+                <select
+                  className="input w-auto py-2 text-xs"
+                  value={regenModel}
+                  onChange={(e) => setRegenModel(e.target.value)}
+                  disabled={regenBusy}
+                  title="Model used when regenerating notes"
+                >
+                  {MODEL_RANKS.map((g) => (
+                    <optgroup key={g.rank} label={g.title}>
+                      {MODELS.filter((mo) => mo.rank === g.rank).map((mo) => (
+                        <option key={mo.id} value={mo.id}>
+                          {mo.label.split(' — ')[0]}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </select>
+                <button className="btn-outline" onClick={regenerate} disabled={regenBusy} title="Regenerate AI notes">
+                  {regenBusy ? 'Regenerating…' : 'Regenerate notes'}
+                </button>
+              </>
+            )}
             <button className="btn-outline" onClick={shareLink} title="Copy link">
               <IconShare width={16} height={16} />
             </button>
@@ -540,6 +612,23 @@ function MeetingView() {
                   {m.summary || (isLive ? 'Building summary as the meeting goes…' : 'No summary yet.')}
                 </div>
               </Section>
+
+              {!!(m.objectives || []).length && (
+                <Section
+                  title="Objectives"
+                  icon="🎯"
+                  right={<span className="text-xs text-slate-400">{m.objectives.length}</span>}
+                >
+                  <ul className="space-y-1.5">
+                    {m.objectives.map((o, i) => (
+                      <li key={i} className="text-sm text-slate-700 flex gap-2">
+                        <span className="text-brand">•</span>
+                        {o}
+                      </li>
+                    ))}
+                  </ul>
+                </Section>
+              )}
 
               <Section
                 title="Action Items"
@@ -737,6 +826,29 @@ function MeetingView() {
           </div>
         )}
       </div>
+
+      {regenBusy && (
+        <div className="fixed inset-0 z-50 bg-ink/40 grid place-items-center p-4">
+          <div className="card p-6 flex items-center gap-4">
+            <span className="w-8 h-8 rounded-full border-2 border-brand border-t-transparent animate-spin shrink-0" />
+            <div>
+              <div className="font-semibold">Regenerating notes…</div>
+              <p className="text-sm text-slate-500 mt-0.5">
+                The AI is re-reading the transcript. You&apos;ll review the result before anything is saved.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {preview && (
+        <RegeneratePreview
+          notes={preview}
+          applying={applying}
+          onApply={applyPreview}
+          onDiscard={discardPreview}
+        />
+      )}
     </div>
   );
 }
@@ -860,6 +972,107 @@ function BulkSpeakers({ meeting, onDone, toast }) {
         </div>
       ))}
       <button onClick={apply} className="btn-primary mt-2">Apply names</button>
+    </div>
+  );
+}
+
+// Review dialog for regenerated notes. Purely presentational — nothing is
+// persisted until onApply PUTs the exact notes shown here.
+function RegeneratePreview({ notes, applying, onApply, onDiscard }) {
+  return (
+    <div className="fixed inset-0 z-50 bg-ink/40 grid place-items-center p-4" onClick={onDiscard}>
+      <div
+        className="card w-full max-w-2xl max-h-[85vh] overflow-y-auto p-6"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h3 className="font-bold text-lg">Review regenerated notes</h3>
+        <p className="text-sm text-slate-500 mt-0.5">
+          Nothing is saved until you apply. Discard to keep the current notes.
+        </p>
+
+        <div className="mt-5 space-y-5">
+          <div>
+            <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Title</div>
+            <div className="font-semibold mt-1">{notes.title}</div>
+          </div>
+
+          {!!(notes.keywords || []).length && (
+            <div className="flex flex-wrap gap-2">
+              {notes.keywords.map((k) => (
+                <span key={k} className="chip bg-brand-soft text-brand">{k}</span>
+              ))}
+            </div>
+          )}
+
+          {!!(notes.objectives || []).length && (
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Objectives</div>
+              <ul className="mt-1.5 space-y-1.5">
+                {notes.objectives.map((o, i) => (
+                  <li key={i} className="text-sm text-slate-700 flex gap-2">
+                    <span className="text-brand">•</span>
+                    {o}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          <div>
+            <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Summary</div>
+            <div className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap mt-1">
+              {notes.summary || 'No summary generated.'}
+            </div>
+          </div>
+
+          <div>
+            <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+              Action Items ({(notes.actionItems || []).length})
+            </div>
+            {(notes.actionItems || []).length ? (
+              <ul className="mt-1.5 space-y-1.5">
+                {notes.actionItems.map((a, i) => (
+                  <li key={i} className="text-sm text-slate-700 flex gap-2">
+                    <span className="text-brand">✓</span>
+                    <span>
+                      {a.text}
+                      {a.owner && <span className="text-slate-400"> — {a.owner}</span>}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-slate-400 mt-1">No action items were detected.</p>
+            )}
+          </div>
+
+          {!!(notes.chapters || []).length && (
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Outline</div>
+              <div className="mt-1.5 space-y-3">
+                {notes.chapters.map((c, i) => (
+                  <div key={i} className="flex gap-3">
+                    <span className="text-brand font-bold text-sm">{i + 1}.</span>
+                    <div>
+                      <div className="font-semibold text-sm">{c.title}</div>
+                      <div className="text-sm text-slate-500 mt-0.5">{c.summary}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="mt-6 flex justify-end gap-2">
+          <button className="btn-ghost" onClick={onDiscard} disabled={applying}>
+            Discard
+          </button>
+          <button className="btn-primary" onClick={onApply} disabled={applying}>
+            {applying ? 'Applying…' : 'Apply'}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

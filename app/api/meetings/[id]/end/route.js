@@ -28,7 +28,7 @@ export async function POST(request, { params }) {
   );
 
   try {
-    const { title, summary, actionItems, chapters, keywords } = await summarizeMeeting(
+    const { title, summary, objectives, actionItems, chapters, keywords } = await summarizeMeeting(
       meeting.segments,
       model
     );
@@ -36,12 +36,13 @@ export async function POST(request, { params }) {
       `UPDATE meetings
          SET status = 'ended', ended_at = now(),
              title = CASE WHEN $1 <> '' AND $1 <> 'Untitled meeting' THEN $1 ELSE title END,
-             summary = $2, action_items = $3, chapters = $4, keywords = $5
-       WHERE id = $6
+             summary = $2, objectives = $3, action_items = $4, chapters = $5, keywords = $6
+       WHERE id = $7
        RETURNING title, ended_at`,
       [
         title,
         summary,
+        JSON.stringify(objectives),
         JSON.stringify(actionItems),
         JSON.stringify(chapters),
         JSON.stringify(keywords),
@@ -56,6 +57,7 @@ export async function POST(request, { params }) {
       title: rows[0].title,
       endedAt: fmtTs(rows[0].ended_at),
       summary,
+      objectives,
       actionItems,
       chapters,
       keywords,

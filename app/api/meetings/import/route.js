@@ -60,11 +60,12 @@ export async function POST(request) {
 
     await pool.query(
       `UPDATE meetings SET status = 'ended', ended_at = now(),
-         title = $1, summary = $2, action_items = $3, chapters = $4, keywords = $5
-       WHERE id = $6`,
+         title = $1, summary = $2, objectives = $3, action_items = $4, chapters = $5, keywords = $6
+       WHERE id = $7`,
       [
         finalTitle,
         notes?.summary || '',
+        JSON.stringify(notes?.objectives || []),
         JSON.stringify(notes?.actionItems || []),
         JSON.stringify(notes?.chapters || []),
         JSON.stringify(notes?.keywords || []),

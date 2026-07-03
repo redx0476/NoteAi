@@ -22,19 +22,20 @@ export async function POST(request, { params }) {
   const model = (await request.json().catch(() => ({})))?.model;
 
   try {
-    const { title, summary, actionItems, chapters, keywords } = await summarizeMeeting(
+    const { title, summary, objectives, actionItems, chapters, keywords } = await summarizeMeeting(
       meeting.segments,
       model
     );
     const { rows } = await pool.query(
       `UPDATE meetings
          SET title = CASE WHEN $1 <> '' AND $1 <> 'Untitled meeting' THEN $1 ELSE title END,
-             summary = $2, action_items = $3, chapters = $4, keywords = $5
-       WHERE id = $6
+             summary = $2, objectives = $3, action_items = $4, chapters = $5, keywords = $6
+       WHERE id = $7
        RETURNING title`,
       [
         title,
         summary,
+        JSON.stringify(objectives),
         JSON.stringify(actionItems),
         JSON.stringify(chapters),
         JSON.stringify(keywords),
@@ -42,7 +43,7 @@ export async function POST(request, { params }) {
       ]
     );
     // Merge into the meeting fetched above — no second full-transcript read.
-    return Response.json({ ...meeting, title: rows[0].title, summary, actionItems, chapters, keywords });
+    return Response.json({ ...meeting, title: rows[0].title, summary, objectives, actionItems, chapters, keywords });
   } catch (err) {
     // Leave the meeting live and untouched so the next interval can retry.
     return Response.json({ error: 'Notes generation failed', detail: String(err.message) }, { status: 502 });
