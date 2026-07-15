@@ -25,19 +25,20 @@ export default function Sidebar({ onRecord }) {
   const isActive = (to, end) => (end ? pathname === to : pathname === to || pathname.startsWith(`${to}/`));
 
   return (
-    <aside className="w-64 shrink-0 border-r border-slate-200 bg-white flex flex-col h-full dark:border-slate-800 dark:bg-slate-900">
+    <aside className="w-64 shrink-0 border-r flex flex-col h-full" style={{ borderColor: 'var(--line)', background: 'var(--surface)' }}>
       <div className="px-5 h-16 flex items-center">
         <Logo size={30} />
       </div>
+      <div className="mx-5 rule-gold mb-3" />
 
       <button
         onClick={() => router.push('/app/settings')}
-        className="mx-3 mb-2 flex items-center gap-2.5 rounded-xl px-2.5 py-2 hover:bg-slate-50 dark:hover:bg-slate-800 text-left"
+        className="mx-3 mb-2 flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-left transition hover:bg-[var(--surface-2)]"
       >
         <Avatar name={user.name || user.email} size={34} />
         <div className="min-w-0">
           <div className="text-sm font-semibold truncate">{user.name || 'You'}</div>
-          <div className="text-xs text-slate-400 truncate">{user.email}</div>
+          <div className="text-xs truncate" style={{ color: 'var(--muted)' }}>{user.email}</div>
         </div>
       </button>
 
@@ -48,33 +49,42 @@ export default function Sidebar({ onRecord }) {
       </div>
 
       <nav className="px-3 space-y-0.5">
-        {nav.map(({ to, label, Icon, end }) => (
-          <Link
-            key={to}
-            href={to}
-            className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition ${
-              isActive(to, end)
-                ? 'bg-brand-soft text-brand dark:bg-brand/15'
-                : 'text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800'
-            }`}
-          >
-            <Icon width={18} height={18} />
-            {label}
-          </Link>
-        ))}
+        {nav.map(({ to, label, Icon, end }) => {
+          const active = isActive(to, end);
+          return (
+            <Link
+              key={to}
+              href={to}
+              className={`relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition ${
+                active ? 'text-[var(--accent-2)] dark:text-champagne' : 'hover:bg-[var(--surface-2)]'
+              }`}
+              style={active ? { background: 'var(--accent-wash)' } : { color: 'var(--muted)' }}
+            >
+              {active && (
+                <span className="absolute left-0 top-1/2 h-5 -translate-y-1/2 rounded-r-full" style={{ width: 3, background: 'var(--accent)' }} />
+              )}
+              <Icon width={18} height={18} />
+              {label}
+            </Link>
+          );
+        })}
       </nav>
 
       <div className="mt-auto p-4 space-y-3">
         <button
           onClick={() => setTheme(toggleTheme())}
-          className="w-full flex items-center justify-between rounded-lg px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-800"
+          className="w-full flex items-center justify-between rounded-lg px-3 py-2 text-sm font-medium transition hover:bg-[var(--surface-2)]"
+          style={{ color: 'var(--muted)' }}
         >
           <span>{theme === 'dark' ? '🌙 Dark' : '☀️ Light'} mode</span>
-          <span className="text-xs text-slate-400">toggle</span>
+          <span className="text-xs" style={{ color: 'var(--muted)' }}>toggle</span>
         </button>
-        <div className="rounded-xl bg-slate-50 border border-slate-200 p-3 dark:bg-slate-800/60 dark:border-slate-700">
-          <div className="text-xs font-semibold text-slate-700 dark:text-slate-200">Live streaming notes</div>
-          <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+        <div className="rounded-xl p-3.5 border" style={{ background: 'var(--surface-2)', borderColor: 'var(--line)' }}>
+          <div className="flex items-center gap-1.5 text-xs font-semibold" style={{ color: 'var(--accent-2)' }}>
+            <span className="inline-block h-1.5 w-1.5 rounded-full" style={{ background: 'var(--accent)' }} />
+            Live streaming notes
+          </div>
+          <div className="text-[11px] mt-1 leading-relaxed" style={{ color: 'var(--muted)' }}>
             Start a live meeting to get word-by-word transcription.
           </div>
         </div>

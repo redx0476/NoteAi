@@ -73,7 +73,7 @@ export default function FeaturesPage() {
           className="pointer-events-none absolute inset-0 -z-10"
           style={{
             background:
-              'radial-gradient(55% 45% at 50% 0%, rgba(47,107,255,0.14), transparent 70%)',
+              'radial-gradient(55% 45% at 50% 0%, rgba(201,162,75,0.16), transparent 70%)',
           }}
         />
         <div className="mx-auto max-w-3xl px-5 py-16 text-center md:py-24">
@@ -132,7 +132,7 @@ export default function FeaturesPage() {
                 viewport={{ once: true, margin: '-60px' }}
                 transition={{ duration: 0.45, delay: (i % 2) * 0.06 }}
               >
-                <div className="grid h-12 w-12 place-items-center rounded-xl bg-gradient-to-br from-brand to-[#7b5bff] text-white">
+                <div className="grid h-12 w-12 place-items-center rounded-xl text-[#1a1207]" style={{ background: 'linear-gradient(140deg, #eed49a, #c9a24b 55%, #a97f28)' }}>
                   <Icon className="h-6 w-6" />
                 </div>
                 <h3 className="mt-4 text-xl font-bold text-ink dark:text-white">{f.title}</h3>
@@ -155,15 +155,16 @@ export default function FeaturesPage() {
 
       {/* CTA */}
       <Section className="mx-auto max-w-6xl px-5 pb-24">
-        <div className="rounded-3xl bg-gradient-to-br from-brand to-[#7b5bff] px-6 py-14 text-center text-white md:px-12">
-          <h2 className="text-3xl font-extrabold tracking-tight md:text-4xl">Ready to try NOTEAI?</h2>
-          <p className="mx-auto mt-3 max-w-lg text-white/85">
+        <div
+          className="relative overflow-hidden rounded-3xl px-6 py-14 text-center text-[#f0ebe1] md:px-12"
+          style={{ background: 'radial-gradient(120% 120% at 85% 0%, #241c11 0%, #14110c 45%, #0b0a08 100%)' }}
+        >
+          <div className="mx-auto mb-5 h-px w-16" style={{ background: '#e6c878', opacity: 0.6 }} />
+          <h2 className="font-display text-3xl font-medium tracking-luxe md:text-4xl">Ready to try NOTEAI?</h2>
+          <p className="mx-auto mt-3 max-w-lg text-[#c9c0af]">
             Get started free — no credit card required.
           </p>
-          <Link
-            href="/login?mode=signup"
-            className="btn mt-8 inline-flex bg-white px-6 py-3 text-base text-brand hover:bg-white/90"
-          >
+          <Link href="/login?mode=signup" className="btn-primary mt-8 px-6 py-3 text-base">
             Start for free
           </Link>
         </div>

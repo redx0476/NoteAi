@@ -69,8 +69,14 @@ async function startCapture({ tabId, title, platform, meetingUrl }) {
   activeTabId = tabId ?? null;
 
   const streaming = await getStreaming();
-  const streamId = await chrome.tabCapture.getMediaStreamId({ targetTabId: tabId });
+  // Create the offscreen document BEFORE minting the tab-capture stream id.
+  // getMediaStreamId ids go stale quickly; creating a fresh offscreen doc after
+  // minting adds enough delay that the id can expire, yielding a *silent* tab
+  // stream (getUserMedia doesn't throw) — the mic still records, so only the
+  // local speaker is transcribed. Ensuring the doc first hands the fresh id to
+  // an already-live consumer immediately.
   await ensureOffscreen();
+  const streamId = await chrome.tabCapture.getMediaStreamId({ targetTabId: tabId });
   await chrome.runtime.sendMessage({
     target: 'offscreen',
     type: 'OFFSCREEN_START',
@@ -219,6 +225,24 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           const tabId = activeTabId ?? (await chrome.storage.local.get('activeTabId')).activeTabId;
           if (tabId != null) {
             chrome.tabs.sendMessage(tabId, { type: 'MIC_STATUS', ok: false }).catch(() => {});
+          }
+          break;
+        }
+
+        // Offscreen couldn't capture the meeting tab's audio (stale stream id /
+        // capture refused) → the other participants would be missing. Stop the
+        // half-started capture and tell the user to press Start again.
+        case 'TAB_CAPTURE_FAILED': {
+          const tabId = activeTabId ?? (await chrome.storage.local.get('activeTabId')).activeTabId;
+          await finalizeMeeting().catch(() => {});
+          if (tabId != null) {
+            chrome.tabs
+              .sendMessage(tabId, {
+                type: 'MIC_STATUS',
+                ok: false,
+                message: "Couldn't capture the meeting audio, so other participants wouldn't be recorded. Click the NOTEAI icon and press Start again.",
+              })
+              .catch(() => {});
           }
           break;
         }

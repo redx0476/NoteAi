@@ -135,9 +135,9 @@ export default function Popup() {
     <div className="brand">
       <span className="badge">
         <svg width="18" height="18" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <rect x="16" y="9" width="8" height="15" rx="4" fill="#fff" />
-          <path d="M13 19a7 7 0 0 0 14 0" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" fill="none" />
-          <path d="M20 26v4" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" />
+          <rect x="16" y="9" width="8" height="15" rx="4" fill="#2b2010" />
+          <path d="M13 19a7 7 0 0 0 14 0" stroke="#2b2010" strokeWidth="2.4" strokeLinecap="round" fill="none" />
+          <path d="M20 26v4" stroke="#2b2010" strokeWidth="2.4" strokeLinecap="round" />
         </svg>
       </span>
       <span>NOTE<em>AI</em></span>

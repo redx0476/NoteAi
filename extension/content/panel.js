@@ -7,7 +7,7 @@
   panel.innerHTML = `
     <div class="mn-head">
       <span class="mn-dot"></span>
-      <span class="mn-title">MeetNotes</span>
+      <span class="mn-title">NOTEAI</span>
       <span class="mn-badge">LIVE</span>
       <div class="mn-actions">
         <button class="mn-btn mn-min" title="Minimize">–</button>
@@ -39,7 +39,7 @@
   panel.querySelector('.mn-mic-dismiss').addEventListener('click', () => (micWarn.hidden = true));
 
   // Stable per-speaker accent colours.
-  const palette = ['#8e7bff', '#22d3ee', '#f472b6', '#34d399', '#fbbf24', '#fb7185', '#a78bfa', '#60a5fa'];
+  const palette = ['#e6c878', '#7db3a3', '#e0a07f', '#b4a0d8', '#8fb8dc', '#d4c56a', '#dba0b8', '#93bd96'];
   const speakerColors = new Map();
   function colorFor(speaker) {
     if (!speakerColors.has(speaker)) speakerColors.set(speaker, palette[speakerColors.size % palette.length]);

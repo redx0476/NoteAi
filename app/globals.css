@@ -2,8 +2,38 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Semantic tokens ─────────────────────────────────────────────────────────
+   Light = editorial luxe (warm ivory paper + ink). Dark = premium (warm
+   near-black + champagne). Everything downstream reads these variables so a
+   single theme flips the whole product. */
 :root {
   color-scheme: light;
+  --bg: #f6f3ec;          /* warm ivory canvas */
+  --surface: #fffdf9;     /* paper — cards, panels */
+  --surface-2: #efeadd;   /* sunk wells, tracks */
+  --line: #e6dfce;        /* warm hairline */
+  --text: #201b13;        /* warm ink */
+  --muted: #7a7264;       /* secondary text */
+  --accent: #b0842a;      /* champagne gold, contrast-safe on light */
+  --accent-2: #8a6516;    /* deeper gold for text/hover */
+  --accent-ink: #fffdf9;  /* text/glyphs sitting on a gold fill */
+  --accent-wash: #f3ecda; /* faint gold tint for active states */
+  --scroll: #d8cfb8;
+}
+
+html.dark {
+  color-scheme: dark;
+  --bg: #0c0b09;          /* warm near-black */
+  --surface: #16130f;     /* elevated warm charcoal */
+  --surface-2: #201b15;
+  --line: #2c261e;        /* warm hairline */
+  --text: #f0ebe1;        /* warm off-white */
+  --muted: #a89e8b;
+  --accent: #e6c878;      /* champagne — glows on dark */
+  --accent-2: #f0d68f;
+  --accent-ink: #1a1207;  /* dark text on gold fill */
+  --accent-wash: rgba(230, 200, 120, 0.12);
+  --scroll: #342e24;
 }
 
 html,
@@ -13,55 +43,91 @@ body {
 
 body {
   margin: 0;
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  background: #f6f8fb;
-  color: #0f172a;
+  background: var(--bg);
+  color: var(--text);
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
-html.dark body {
-  background: #0b1020;
-  color: #e5e7eb;
-}
-html.dark {
-  color-scheme: dark;
+/* Display serif carries the personality; used with restraint on headings and
+   the wordmark, never on body copy. */
+h1,
+h2,
+h3,
+.font-display {
+  font-family: var(--font-serif), Georgia, serif;
+  letter-spacing: -0.02em;
+  font-weight: 500;
 }
 
-/* Thin, quiet scrollbars to match the clean look. */
+/* Thin, warm scrollbars to match the refined look. */
 * {
   scrollbar-width: thin;
-  scrollbar-color: #cbd5e1 transparent;
+  scrollbar-color: var(--scroll) transparent;
 }
 *::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 *::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: var(--scroll);
   border-radius: 4px;
 }
 
 @layer components {
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition;
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-all duration-200;
   }
+  /* Primary = solid champagne gold with ink glyphs and a soft gold glow. */
   .btn-primary {
-    @apply btn bg-brand text-white hover:bg-brand-dark shadow-sm;
+    @apply btn text-[var(--accent-ink)];
+    background: linear-gradient(180deg, var(--accent-2) 0%, var(--accent) 100%);
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.25) inset, 0 8px 20px -8px rgba(176, 132, 42, 0.5);
+  }
+  .btn-primary:hover {
+    filter: brightness(1.06);
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.3) inset, 0 12px 26px -8px rgba(176, 132, 42, 0.6);
   }
   .btn-ghost {
-    @apply btn text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800;
+    @apply btn text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--surface-2)];
   }
   .btn-outline {
-    @apply btn border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800;
+    @apply btn border text-[var(--text)];
+    border-color: var(--line);
+    background: var(--surface);
+  }
+  .btn-outline:hover {
+    border-color: var(--accent);
+    color: var(--accent-2);
   }
   .input {
-    @apply w-full rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 text-sm outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder-slate-500;
+    @apply w-full rounded-xl px-3.5 py-2.5 text-sm outline-none transition;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    color: var(--text);
   }
+  .input::placeholder {
+    color: var(--muted);
+  }
+  .input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-wash);
+  }
+  /* Cards: paper surface, warm hairline, layered soft shadow. */
   .card {
-    @apply rounded-2xl border border-slate-200 bg-white shadow-card dark:border-slate-800 dark:bg-slate-900;
+    @apply rounded-2xl;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    box-shadow: 0 1px 2px rgba(32, 27, 19, 0.04), 0 6px 20px -8px rgba(32, 27, 19, 0.1);
   }
   .chip {
     @apply inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium;
+  }
+  /* A thin engraved gold rule — the recurring signature divider. */
+  .rule-gold {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    opacity: 0.5;
   }
 }
 
@@ -73,6 +139,15 @@ html.dark {
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
   }
 }
 

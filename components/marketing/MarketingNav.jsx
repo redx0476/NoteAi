@@ -26,7 +26,7 @@ export default function MarketingNav() {
     <header
       className={`sticky top-0 z-50 transition-colors ${
         scrolled
-          ? 'border-b border-slate-200/70 bg-white/80 backdrop-blur-md dark:border-slate-800/70 dark:bg-slate-950/70'
+          ? 'border-b border-[var(--line)] bg-[var(--bg)]/85 backdrop-blur-md'
           : 'border-b border-transparent bg-transparent'
       }`}
     >
@@ -41,7 +41,7 @@ export default function MarketingNav() {
             <Link
               key={l.href}
               href={l.href}
-              className="rounded-lg px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-100 hover:text-ink dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
+              className="rounded-lg px-3 py-2 text-sm font-medium text-[var(--muted)] transition hover:bg-[var(--surface-2)] hover:text-[var(--text)]"
             >
               {l.label}
             </Link>
@@ -62,7 +62,7 @@ export default function MarketingNav() {
           onClick={() => setOpen((v) => !v)}
           aria-label="Toggle menu"
           aria-expanded={open}
-          className="grid h-10 w-10 place-items-center rounded-lg text-slate-600 hover:bg-slate-100 md:hidden dark:text-slate-300 dark:hover:bg-slate-800"
+          className="grid h-10 w-10 place-items-center rounded-lg text-[var(--muted)] hover:bg-[var(--surface-2)] md:hidden"
         >
           <IconChevron className={`h-5 w-5 transition-transform ${open ? 'rotate-180' : ''}`} />
         </button>
@@ -70,14 +70,14 @@ export default function MarketingNav() {
 
       {/* Mobile menu */}
       {open && (
-        <div className="border-t border-slate-200 bg-white px-5 py-3 md:hidden dark:border-slate-800 dark:bg-slate-950">
+        <div className="border-t border-[var(--line)] bg-[var(--surface)] px-5 py-3 md:hidden">
           <div className="flex flex-col gap-1">
             {LINKS.map((l) => (
               <Link
                 key={l.href}
                 href={l.href}
                 onClick={() => setOpen(false)}
-                className="rounded-lg px-3 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800"
+                className="rounded-lg px-3 py-2.5 text-sm font-medium text-[var(--text)] hover:bg-[var(--surface-2)]"
               >
                 {l.label}
               </Link>

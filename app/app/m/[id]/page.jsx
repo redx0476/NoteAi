@@ -61,7 +61,7 @@ function AiChat({ id }) {
 
   return (
     <div className="card flex flex-col h-full">
-      <div className="px-4 py-3 border-b border-slate-100 font-semibold text-sm dark:border-slate-800">AI Chat</div>
+      <div className="px-4 py-3 border-b border-[var(--line)] font-display text-base font-medium tracking-luxe">AI Chat</div>
       <div className="flex-1 overflow-y-auto p-4 space-y-3">
         {!log.length && (
           <div className="space-y-2">
@@ -70,7 +70,7 @@ function AiChat({ id }) {
               <button
                 key={s}
                 onClick={() => ask(s)}
-                className="block w-full text-left text-sm rounded-lg border border-slate-200 px-3 py-2 hover:bg-slate-50"
+                className="block w-full text-left text-sm rounded-lg border border-[var(--line)] px-3 py-2 hover:bg-[var(--surface-2)]"
               >
                 {s}
               </button>
@@ -81,7 +81,7 @@ function AiChat({ id }) {
           <div key={i} className={msg.role === 'user' ? 'text-right' : ''}>
             <div
               className={`inline-block rounded-2xl px-3.5 py-2 text-sm max-w-[85%] whitespace-pre-wrap text-left ${
-                msg.role === 'user' ? 'bg-brand text-white' : 'bg-slate-100 text-slate-800'
+                msg.role === 'user' ? 'bg-brand text-[var(--accent-ink)]' : 'bg-[var(--surface-2)] text-[var(--text)]'
               }`}
             >
               {msg.text}
@@ -95,7 +95,7 @@ function AiChat({ id }) {
           e.preventDefault();
           ask();
         }}
-        className="p-3 border-t border-slate-100 flex gap-2 dark:border-slate-800"
+        className="p-3 border-t border-[var(--line)] flex gap-2"
       >
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Ask about this meeting…" className="input" />
         <button className="btn-primary px-3" disabled={busy}>
@@ -474,11 +474,11 @@ function MeetingView() {
 
   return (
     <div className="h-full flex flex-col">
-      <header className="shrink-0 border-b border-slate-200 bg-white px-6 py-4 no-print dark:border-slate-800 dark:bg-slate-900">
+      <header className="shrink-0 border-b border-[var(--line)] px-6 py-4 no-print" style={{ background: 'var(--surface)' }}>
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
-            <Link href="/app" className="text-xs text-slate-400 hover:text-brand">← All meetings</Link>
-            <h1 className="text-xl font-bold truncate mt-1 flex items-center gap-2">
+            <Link href="/app" className="text-xs hover:text-brand" style={{ color: 'var(--muted)' }}>← All meetings</Link>
+            <h1 className="font-display text-2xl font-medium tracking-luxe truncate mt-1 flex items-center gap-2">
               {m.title}
               {isLive && (
                 <span className="chip bg-red-50 text-red-500">
@@ -570,14 +570,15 @@ function MeetingView() {
           </div>
         </div>
 
-        <div className="mt-4 flex gap-6 border-b border-slate-100 -mb-4 dark:border-slate-800">
+        <div className="mt-4 flex gap-6 border-b border-[var(--line)] -mb-4">
           {['summary', 'transcript'].map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
               className={`pb-3 text-sm font-semibold capitalize border-b-2 -mb-px transition ${
-                tab === t ? 'border-brand text-brand' : 'border-transparent text-slate-500 hover:text-slate-700'
+                tab === t ? 'border-brand text-[var(--accent-2)] dark:text-champagne' : 'border-transparent hover:text-[var(--text)]'
               }`}
+              style={tab === t ? undefined : { color: 'var(--muted)' }}
             >
               {t}
             </button>
@@ -705,7 +706,7 @@ function MeetingView() {
               )}
             </div>
 
-            <div className="border-l border-slate-200 p-4 overflow-hidden no-print hidden lg:block dark:border-slate-800">
+            <div className="border-l border-[var(--line)] p-4 overflow-hidden no-print hidden lg:block" style={{ background: 'var(--surface)' }}>
               <AiChat id={id} />
             </div>
           </div>
@@ -759,7 +760,7 @@ function MeetingView() {
                       return (
                         <span
                           key={sp}
-                          className="chip border border-slate-200"
+                          className="chip border border-[var(--line)]"
                           style={{ color: colorFor(sp) }}
                         >
                           <Avatar name={sp} size={18} /> {sp}
@@ -869,7 +870,7 @@ const SegmentRow = memo(function SegmentRow({
   onHighlight,
 }) {
   return (
-    <div className="group flex gap-3 rounded-lg px-2 py-2 hover:bg-slate-50 dark:hover:bg-slate-800/60">
+    <div className="group flex gap-3 rounded-lg px-2 py-2 hover:bg-[var(--surface-2)]">
       <Avatar name={s.speaker} size={30} />
       <div className="flex-1 min-w-0">
         <div className="flex items-baseline gap-2">
@@ -952,7 +953,7 @@ function BulkSpeakers({ meeting, onDone, toast }) {
     onDone();
   }
   return (
-    <div className="mt-4 border-t border-slate-100 pt-4 space-y-2">
+    <div className="mt-4 border-t border-[var(--line)] pt-4 space-y-2">
       <datalist id="attendees">
         {(meeting.participants || []).map((n) => (
           <option key={n} value={n} />

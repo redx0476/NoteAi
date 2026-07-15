@@ -33,8 +33,8 @@ export default function Settings() {
 
   return (
     <div className="h-full overflow-y-auto">
-      <header className="h-16 border-b border-slate-200 bg-white flex items-center px-6 dark:border-slate-800 dark:bg-slate-900">
-        <h1 className="font-bold text-lg">Settings</h1>
+      <header className="h-16 border-b border-[var(--line)] flex items-center px-6" style={{ background: 'var(--surface)' }}>
+        <h1 className="font-display text-xl font-medium tracking-luxe">Settings</h1>
       </header>
 
       <div className="max-w-2xl mx-auto px-6 py-8 space-y-6">
@@ -59,7 +59,7 @@ export default function Settings() {
               <label
                 key={m.id}
                 className={`flex items-center gap-3 rounded-xl border p-3 cursor-pointer transition ${
-                  model === m.id ? 'border-brand bg-brand-soft' : 'border-slate-200 hover:bg-slate-50'
+                  model === m.id ? 'border-brand bg-brand-soft dark:bg-brand/10' : 'border-[var(--line)] hover:bg-[var(--surface-2)]'
                 }`}
               >
                 <input
@@ -91,8 +91,8 @@ export default function Settings() {
                 }}
                 className={`rounded-xl border p-4 text-sm font-semibold transition ${
                   theme === t.id
-                    ? 'border-brand bg-brand-soft text-brand dark:bg-brand/15'
-                    : 'border-slate-200 hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800'
+                    ? 'border-brand bg-brand-soft text-[var(--accent-2)] dark:bg-brand/15 dark:text-champagne'
+                    : 'border-[var(--line)] hover:bg-[var(--surface-2)]'
                 }`}
               >
                 {t.label}

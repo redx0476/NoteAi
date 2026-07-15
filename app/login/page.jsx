@@ -41,25 +41,53 @@ export default function AuthPage() {
 
   return (
     <div className="min-h-full grid lg:grid-cols-2">
-      {/* Brand panel */}
-      <div className="hidden lg:flex flex-col justify-between p-12 bg-gradient-to-br from-brand to-[#7b5bff] text-white">
+      {/* Brand panel — dark premium with a champagne signature */}
+      <div
+        className="relative hidden lg:flex flex-col justify-between overflow-hidden p-12 text-[#f0ebe1]"
+        style={{
+          background:
+            'radial-gradient(120% 90% at 12% 8%, #211a10 0%, #14110c 42%, #0b0a08 100%)',
+        }}
+      >
+        {/* ambient gold glow */}
+        <div
+          className="pointer-events-none absolute -right-24 -top-24 h-80 w-80 rounded-full blur-3xl"
+          style={{ background: 'radial-gradient(circle, rgba(230,200,120,0.20), transparent 70%)' }}
+        />
         <Logo size={34} showText={false} />
-        <div>
-          <h1 className="text-4xl font-extrabold leading-tight">Your AI notetaker for every meeting.</h1>
-          <p className="mt-4 text-white/80 max-w-md">
-            Real-time transcription with speaker labels, instant summaries, action items, and searchable
-            notes — for every conversation.
+
+        <div className="relative">
+          <div className="mb-5 text-[11px] font-semibold uppercase tracking-[0.28em] text-champagne">
+            AI Meeting Notes
+          </div>
+          <h1 className="font-display text-[2.7rem] font-medium leading-[1.08] tracking-luxe">
+            Every voice in the room,<br />
+            <span className="italic text-champagne">captured with care.</span>
+          </h1>
+          <p className="mt-5 max-w-md text-[15px] leading-relaxed text-[#c9c0af]">
+            Real-time transcription with speaker labels, instant summaries, action items, and
+            searchable notes — for every conversation.
           </p>
-          <div className="mt-8 space-y-3 text-white/90 text-sm">
+          <div className="mt-9 space-y-3.5 text-sm text-[#d8d0bf]">
             {['Live word-by-word captions', 'Auto summary + action items', 'Playback & highlights'].map((t) => (
-              <div key={t} className="flex items-center gap-2">
-                <span className="grid place-items-center w-5 h-5 rounded-full bg-white/20">✓</span>
+              <div key={t} className="flex items-center gap-3">
+                <span className="grid h-5 w-5 place-items-center rounded-full text-[11px] text-[#1a1207]" style={{ background: '#e6c878' }}>
+                  ✓
+                </span>
                 {t}
               </div>
             ))}
           </div>
+          {/* signature: an engraved gold waveform */}
+          <svg className="mt-10 h-8 w-64 opacity-70" viewBox="0 0 260 32" fill="none" aria-hidden>
+            {Array.from({ length: 34 }).map((_, i) => {
+              const h = 4 + Math.abs(Math.sin(i * 0.9)) * 22 * (0.4 + Math.abs(Math.sin(i * 0.35)));
+              return <rect key={i} x={i * 7.6} y={(32 - h) / 2} width="2.4" height={h} rx="1.2" fill="#e6c878" opacity={0.35 + (i % 5) * 0.13} />;
+            })}
+          </svg>
         </div>
-        <div className="text-white/60 text-xs">© {new Date().getFullYear()} NOTEAI</div>
+
+        <div className="relative text-xs text-[#8a8271]">© {new Date().getFullYear()} NOTEAI</div>
       </div>
 
       {/* Form */}
@@ -68,21 +96,24 @@ export default function AuthPage() {
           <div className="lg:hidden mb-6 flex justify-center">
             <LogoMark size={44} />
           </div>
-          <h2 className="text-2xl font-bold text-center">
+          <h2 className="font-display text-3xl font-medium text-center tracking-luxe">
             {mode === 'login' ? 'Welcome back' : 'Create your account'}
           </h2>
-          <p className="text-center text-sm text-slate-500 mt-1">
+          <p className="text-center text-sm mt-2" style={{ color: 'var(--muted)' }}>
             {mode === 'login' ? 'Log in to your notes' : 'Start taking AI notes — free'}
           </p>
 
-          <div className="mt-6 grid grid-cols-2 gap-1 rounded-xl bg-slate-100 p-1">
+          <div className="mt-7 grid grid-cols-2 gap-1 rounded-xl p-1" style={{ background: 'var(--surface-2)' }}>
             {['login', 'signup'].map((m) => (
               <button
                 key={m}
                 onClick={() => setMode(m)}
-                className={`rounded-lg py-2 text-sm font-semibold transition ${
-                  mode === m ? 'bg-white shadow-sm text-ink' : 'text-slate-500'
-                }`}
+                className="rounded-lg py-2 text-sm font-semibold transition"
+                style={
+                  mode === m
+                    ? { background: 'var(--surface)', color: 'var(--text)', boxShadow: '0 1px 3px rgba(32,27,19,.12)' }
+                    : { color: 'var(--muted)' }
+                }
               >
                 {m === 'login' ? 'Log in' : 'Sign up'}
               </button>

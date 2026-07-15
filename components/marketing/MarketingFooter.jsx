@@ -35,12 +35,12 @@ const COLUMNS = [
 
 export default function MarketingFooter() {
   return (
-    <footer className="border-t border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
+    <footer className="border-t border-[var(--line)]" style={{ background: 'var(--surface)' }}>
       <div className="mx-auto max-w-6xl px-5 py-14">
         <div className="grid gap-10 md:grid-cols-[1.4fr_1fr_1fr_1fr]">
           <div>
             <Logo size={32} />
-            <p className="mt-4 max-w-xs text-sm text-slate-500 dark:text-slate-400">
+            <p className="mt-4 max-w-xs text-sm" style={{ color: 'var(--muted)' }}>
               AI meeting notes that transcribe, summarize, and answer questions about every
               conversation — automatically.
             </p>
@@ -51,13 +51,13 @@ export default function MarketingFooter() {
 
           {COLUMNS.map((col) => (
             <div key={col.title}>
-              <h4 className="text-sm font-semibold text-ink dark:text-white">{col.title}</h4>
+              <h4 className="text-sm font-semibold" style={{ color: 'var(--text)' }}>{col.title}</h4>
               <ul className="mt-4 space-y-2.5">
                 {col.links.map((l) => (
                   <li key={l.label}>
                     <Link
                       href={l.href}
-                      className="text-sm text-slate-500 transition hover:text-brand dark:text-slate-400 dark:hover:text-brand-light"
+                      className="text-sm text-[var(--muted)] transition hover:text-[var(--accent-2)]"
                     >
                       {l.label}
                     </Link>
@@ -68,7 +68,7 @@ export default function MarketingFooter() {
           ))}
         </div>
 
-        <div className="mt-12 flex flex-col items-center justify-between gap-3 border-t border-slate-200 pt-6 text-sm text-slate-400 sm:flex-row dark:border-slate-800">
+        <div className="mt-12 flex flex-col items-center justify-between gap-3 border-t border-[var(--line)] pt-6 text-sm sm:flex-row" style={{ color: 'var(--muted)' }}>
           <span>© {new Date().getFullYear()} NOTEAI. All rights reserved.</span>
           <span>Built for better meetings.</span>
         </div>

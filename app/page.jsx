@@ -137,7 +137,7 @@ function TranscriptMockup() {
             <Avatar name={l.name} size={28} />
             <div>
               <div className="text-xs font-semibold text-slate-500 dark:text-slate-400">{l.name}</div>
-              <div className="mt-0.5 rounded-2xl rounded-tl-sm bg-slate-100 px-3 py-2 text-sm text-ink dark:bg-slate-800 dark:text-slate-100">
+              <div className="mt-0.5 rounded-2xl rounded-tl-sm px-3 py-2 text-sm" style={{ background: 'var(--surface-2)', color: 'var(--text)' }}>
                 {l.text}
               </div>
             </div>
@@ -177,7 +177,7 @@ export default function HomePage() {
   }
 
   return (
-    <div className="min-h-full bg-[#f6f8fb] dark:bg-[#0b1020]">
+    <div className="min-h-full" style={{ background: 'var(--bg)' }}>
       <MarketingNav />
 
       {/* Hero */}
@@ -187,7 +187,7 @@ export default function HomePage() {
           className="pointer-events-none absolute inset-0 -z-10"
           style={{
             background:
-              'radial-gradient(60% 50% at 50% 0%, rgba(47,107,255,0.16), transparent 70%), radial-gradient(40% 40% at 85% 10%, rgba(123,91,255,0.14), transparent 70%)',
+              'radial-gradient(60% 50% at 50% 0%, rgba(201,162,75,0.16), transparent 70%), radial-gradient(40% 40% at 85% 10%, rgba(176,132,42,0.12), transparent 70%)',
           }}
         />
         <div className="mx-auto grid max-w-6xl items-center gap-12 px-5 py-16 md:py-24 lg:grid-cols-2">
@@ -196,16 +196,15 @@ export default function HomePage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
           >
-            <span className="chip border border-brand/20 bg-brand-soft text-brand dark:border-brand/30 dark:bg-brand/10">
+            <span className="chip border border-brand/25 bg-brand-soft text-[var(--accent-2)] dark:bg-brand/10 dark:text-champagne">
               <IconMic className="h-3.5 w-3.5" /> AI notetaker for every meeting
             </span>
-            <h1 className="mt-5 text-4xl font-extrabold leading-[1.1] tracking-tight text-ink sm:text-5xl md:text-6xl dark:text-white">
+            <h1 className="mt-5 font-display text-4xl font-medium leading-[1.08] tracking-luxe sm:text-5xl md:text-[3.7rem]" style={{ color: 'var(--text)' }}>
               Never take meeting
               <br />
-              notes{' '}
-              <span className="bg-gradient-to-r from-brand to-[#7b5bff] bg-clip-text text-transparent">again</span>.
+              notes <span className="italic text-brand dark:text-champagne">again</span>.
             </h1>
-            <p className="mt-5 max-w-lg text-lg text-slate-600 dark:text-slate-300">
+            <p className="mt-5 max-w-lg text-lg" style={{ color: 'var(--muted)' }}>
               NOTEAI transcribes your conversations in real time, writes the summary, captures action items,
               and lets you ask questions about anything that was said.
             </p>
@@ -217,7 +216,7 @@ export default function HomePage() {
                 Log in
               </Link>
             </div>
-            <p className="mt-4 text-sm text-slate-400">No credit card required · Free forever plan</p>
+            <p className="mt-4 text-sm" style={{ color: 'var(--muted)' }}>No credit card required · Free forever plan</p>
           </motion.div>
 
           <motion.div
@@ -236,8 +235,8 @@ export default function HomePage() {
         <div className="card grid grid-cols-2 gap-6 p-6 md:grid-cols-4 md:p-8">
           {STATS.map((s) => (
             <div key={s.label} className="text-center">
-              <div className="text-2xl font-extrabold text-brand md:text-3xl">{s.value}</div>
-              <div className="mt-1 text-sm text-slate-500 dark:text-slate-400">{s.label}</div>
+              <div className="font-display text-3xl font-medium text-brand dark:text-champagne md:text-4xl">{s.value}</div>
+              <div className="mt-1 text-sm" style={{ color: 'var(--muted)' }}>{s.label}</div>
             </div>
           ))}
         </div>
@@ -246,10 +245,10 @@ export default function HomePage() {
       {/* Features */}
       <Section className="mx-auto max-w-6xl px-5 py-16 md:py-24">
         <div className="mx-auto max-w-2xl text-center">
-          <h2 className="text-3xl font-extrabold tracking-tight text-ink md:text-4xl dark:text-white">
+          <h2 className="font-display text-3xl font-medium tracking-luxe md:text-4xl" style={{ color: 'var(--text)' }}>
             Everything you need from a meeting assistant
           </h2>
-          <p className="mt-4 text-lg text-slate-600 dark:text-slate-300">
+          <p className="mt-4 text-lg" style={{ color: 'var(--muted)' }}>
             From live captions to searchable knowledge — NOTEAI handles the busywork so you can focus on
             the conversation.
           </p>
@@ -270,8 +269,8 @@ export default function HomePage() {
                 <div className="grid h-11 w-11 place-items-center rounded-xl bg-brand-soft text-brand dark:bg-brand/10">
                   <Icon className="h-5 w-5" />
                 </div>
-                <h3 className="mt-4 text-lg font-bold text-ink dark:text-white">{f.title}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-slate-600 dark:text-slate-300">{f.desc}</p>
+                <h3 className="mt-4 text-lg font-semibold" style={{ color: 'var(--text)' }}>{f.title}</h3>
+                <p className="mt-2 text-sm leading-relaxed" style={{ color: 'var(--muted)' }}>{f.desc}</p>
               </motion.div>
             );
           })}
@@ -281,12 +280,13 @@ export default function HomePage() {
       {/* How it works */}
       <section
         id="how"
-        className="border-y border-slate-200 bg-white py-16 md:py-24 dark:border-slate-800 dark:bg-slate-950"
+        className="border-y border-[var(--line)] py-16 md:py-24"
+        style={{ background: 'var(--surface)' }}
       >
         <div className="mx-auto max-w-6xl px-5">
           <Section className="mx-auto max-w-2xl text-center">
-            <span className="chip bg-brand-soft text-brand dark:bg-brand/10">How it works</span>
-            <h2 className="mt-4 text-3xl font-extrabold tracking-tight text-ink md:text-4xl dark:text-white">
+            <span className="chip bg-brand-soft text-[var(--accent-2)] dark:bg-brand/10 dark:text-champagne">How it works</span>
+            <h2 className="mt-4 font-display text-3xl font-medium tracking-luxe md:text-4xl" style={{ color: 'var(--text)' }}>
               From conversation to knowledge in three steps
             </h2>
           </Section>
@@ -296,14 +296,14 @@ export default function HomePage() {
               const Icon = s.icon;
               return (
                 <Section key={s.title} className="card relative p-6" delay={i * 0.08}>
-                  <div className="absolute right-5 top-5 text-5xl font-extrabold text-slate-100 dark:text-slate-800">
+                  <div className="absolute right-5 top-4 font-display text-5xl font-medium" style={{ color: 'var(--line)' }}>
                     {i + 1}
                   </div>
-                  <div className="grid h-12 w-12 place-items-center rounded-xl bg-gradient-to-br from-brand to-[#7b5bff] text-white">
+                  <div className="grid h-12 w-12 place-items-center rounded-xl text-[#1a1207]" style={{ background: 'linear-gradient(140deg, #eed49a, #c9a24b 55%, #a97f28)' }}>
                     <Icon className="h-6 w-6" />
                   </div>
-                  <h3 className="mt-4 text-lg font-bold text-ink dark:text-white">{s.title}</h3>
-                  <p className="mt-2 text-sm leading-relaxed text-slate-600 dark:text-slate-300">{s.desc}</p>
+                  <h3 className="mt-4 text-lg font-semibold" style={{ color: 'var(--text)' }}>{s.title}</h3>
+                  <p className="mt-2 text-sm leading-relaxed" style={{ color: 'var(--muted)' }}>{s.desc}</p>
                 </Section>
               );
             })}
@@ -314,10 +314,10 @@ export default function HomePage() {
       {/* Integrations */}
       <Section id="integrations" className="mx-auto max-w-6xl px-5 py-16 md:py-20">
         <div className="mx-auto max-w-2xl text-center">
-          <h2 className="text-2xl font-extrabold tracking-tight text-ink md:text-3xl dark:text-white">
+          <h2 className="font-display text-2xl font-medium tracking-luxe md:text-3xl" style={{ color: 'var(--text)' }}>
             Works where your meetings happen
           </h2>
-          <p className="mt-3 text-slate-600 dark:text-slate-300">
+          <p className="mt-3" style={{ color: 'var(--muted)' }}>
             Capture calls straight from your browser or upload existing recordings.
           </p>
         </div>
@@ -325,7 +325,8 @@ export default function HomePage() {
           {INTEGRATIONS.map((name) => (
             <span
               key={name}
-              className="chip border border-slate-200 bg-white px-4 py-2 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200"
+              className="chip border border-[var(--line)] px-4 py-2 text-sm"
+              style={{ background: 'var(--surface)', color: 'var(--text)' }}
             >
               <IconCheck className="h-4 w-4 text-brand" /> {name}
             </span>
@@ -334,27 +335,27 @@ export default function HomePage() {
       </Section>
 
       {/* Testimonials */}
-      <section className="border-t border-slate-200 bg-white py-16 md:py-24 dark:border-slate-800 dark:bg-slate-950">
+      <section className="border-t border-[var(--line)] py-16 md:py-24" style={{ background: 'var(--surface)' }}>
         <div className="mx-auto max-w-6xl px-5">
           <Section className="mx-auto max-w-2xl text-center">
-            <h2 className="text-3xl font-extrabold tracking-tight text-ink md:text-4xl dark:text-white">
+            <h2 className="font-display text-3xl font-medium tracking-luxe md:text-4xl" style={{ color: 'var(--text)' }}>
               Loved by teams and people
             </h2>
           </Section>
           <div className="mt-12 grid gap-5 md:grid-cols-3">
             {TESTIMONIALS.map((t, i) => (
               <Section key={t.name} className="card p-6" delay={i * 0.08}>
-                <div className="flex gap-0.5 text-brand">
+                <div className="flex gap-0.5 text-brand dark:text-champagne">
                   {Array.from({ length: 5 }).map((_, s) => (
                     <IconStar key={s} className="h-4 w-4 fill-current" />
                   ))}
                 </div>
-                <p className="mt-4 text-sm leading-relaxed text-slate-700 dark:text-slate-200">“{t.quote}”</p>
+                <p className="mt-4 font-display text-[15px] italic leading-relaxed" style={{ color: 'var(--text)' }}>“{t.quote}”</p>
                 <div className="mt-5 flex items-center gap-3">
                   <Avatar name={t.name} size={36} />
                   <div>
-                    <div className="text-sm font-semibold text-ink dark:text-white">{t.name}</div>
-                    <div className="text-xs text-slate-500 dark:text-slate-400">{t.role}</div>
+                    <div className="text-sm font-semibold" style={{ color: 'var(--text)' }}>{t.name}</div>
+                    <div className="text-xs" style={{ color: 'var(--muted)' }}>{t.role}</div>
                   </div>
                 </div>
               </Section>
@@ -365,28 +366,29 @@ export default function HomePage() {
 
       {/* Final CTA */}
       <Section className="mx-auto max-w-6xl px-5 py-16 md:py-24">
-        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-brand to-[#7b5bff] px-6 py-14 text-center text-white md:px-12 md:py-20">
+        <div
+          className="relative overflow-hidden rounded-3xl px-6 py-14 text-center text-[#f0ebe1] md:px-12 md:py-20"
+          style={{ background: 'radial-gradient(120% 120% at 85% 0%, #241c11 0%, #14110c 45%, #0b0a08 100%)' }}
+        >
           <div
             aria-hidden
-            className="pointer-events-none absolute inset-0 opacity-30"
-            style={{ background: 'radial-gradient(40% 60% at 80% 0%, rgba(255,255,255,0.35), transparent 70%)' }}
+            className="pointer-events-none absolute inset-0"
+            style={{ background: 'radial-gradient(45% 70% at 82% 0%, rgba(230,200,120,0.28), transparent 70%)' }}
           />
-          <h2 className="relative text-3xl font-extrabold tracking-tight md:text-4xl">
+          <div className="relative mx-auto mb-5 h-px w-16" style={{ background: '#e6c878', opacity: 0.6 }} />
+          <h2 className="relative font-display text-3xl font-medium tracking-luxe md:text-4xl">
             Turn every meeting into searchable knowledge
           </h2>
-          <p className="relative mx-auto mt-4 max-w-xl text-white/85">
+          <p className="relative mx-auto mt-4 max-w-xl text-[#c9c0af]">
             Join teams who never miss a detail. Start transcribing, summarizing, and asking your meetings today.
           </p>
           <div className="relative mt-8 flex flex-wrap items-center justify-center gap-3">
-            <Link
-              href="/login?mode=signup"
-              className="btn inline-flex bg-white px-6 py-3 text-base text-brand hover:bg-white/90"
-            >
+            <Link href="/login?mode=signup" className="btn-primary px-6 py-3 text-base">
               Start for free
             </Link>
             <Link
               href="/login"
-              className="btn inline-flex border border-white/40 px-6 py-3 text-base text-white hover:bg-white/10"
+              className="btn inline-flex border border-[#e6c878]/40 px-6 py-3 text-base text-champagne hover:bg-[#e6c878]/10"
             >
               <IconSend className="h-4 w-4" /> Log in
             </Link>

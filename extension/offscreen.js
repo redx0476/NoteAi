@@ -49,9 +49,29 @@ async function start(msg) {
   cfg = msg;
   startTime = Date.now();
 
-  stream = await navigator.mediaDevices.getUserMedia({
-    audio: { mandatory: { chromeMediaSource: 'tab', chromeMediaSourceId: msg.streamId } },
-  });
+  // Capture the meeting tab's audio (the other participants → channel 1). If the
+  // stream id has gone stale or capture is refused, getUserMedia can either throw
+  // or hand back a stream with no live audio track. Both mean remote audio is
+  // lost, so treat them the same: report TAB_CAPTURE_FAILED and abort — recording
+  // only the local mic would silently drop everyone else.
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      audio: { mandatory: { chromeMediaSource: 'tab', chromeMediaSourceId: msg.streamId } },
+    });
+  } catch (err) {
+    console.error('[noteai] tab capture failed:', err);
+    chrome.runtime.sendMessage({ type: 'TAB_CAPTURE_FAILED', message: String(err?.message || err) }).catch(() => {});
+    return;
+  }
+  const tabTracks = stream.getAudioTracks();
+  console.log('[noteai] tab audio tracks:', tabTracks.map((t) => ({ readyState: t.readyState, muted: t.muted })));
+  if (!tabTracks.length || tabTracks.every((t) => t.readyState === 'ended')) {
+    console.error('[noteai] tab capture produced no live audio track');
+    stream.getTracks().forEach((t) => t.stop());
+    stream = null;
+    chrome.runtime.sendMessage({ type: 'TAB_CAPTURE_FAILED', message: 'no live tab audio track' }).catch(() => {});
+    return;
+  }
 
   ctx = new AudioContext();
   tabSource = ctx.createMediaStreamSource(stream);
@@ -101,12 +121,49 @@ async function start(msg) {
   analyser.fftSize = 512;
   merger.connect(analyser);
   const buf = new Float32Array(analyser.fftSize);
+
+  // Per-channel diagnostics: tap the tab and mic sources separately so a silent
+  // channel is observable. If the tab channel stays at ~0 while the mic is live,
+  // the meeting audio isn't being captured (see TAB_CAPTURE_FAILED).
+  const tabAnalyser = ctx.createAnalyser();
+  tabAnalyser.fftSize = 512;
+  tabSource.connect(tabAnalyser);
+  const tabBuf = new Float32Array(tabAnalyser.fftSize);
+  let micAnalyser = null;
+  let micBuf = null;
+  if (micSource) {
+    micAnalyser = ctx.createAnalyser();
+    micAnalyser.fftSize = 512;
+    micSource.connect(micAnalyser);
+    micBuf = new Float32Array(micAnalyser.fftSize);
+  }
+  const rmsOf = (an, b) => {
+    an.getFloatTimeDomainData(b);
+    let sum = 0;
+    for (let i = 0; i < b.length; i++) sum += b[i] * b[i];
+    return Math.sqrt(sum / b.length);
+  };
+  let peakTab = 0;
+  let peakMic = 0;
+  let ticks = 0;
+
   levelTimer = setInterval(() => {
     analyser.getFloatTimeDomainData(buf);
     let sum = 0;
     for (let i = 0; i < buf.length; i++) sum += buf[i] * buf[i];
     const rms = Math.min(1, Math.sqrt(sum / buf.length) * 4);
     chrome.runtime.sendMessage({ type: 'LEVEL', level: rms }).catch(() => {});
+
+    peakTab = Math.max(peakTab, rmsOf(tabAnalyser, tabBuf));
+    if (micAnalyser) peakMic = Math.max(peakMic, rmsOf(micAnalyser, micBuf));
+    if (++ticks >= 7) {
+      // ~1s window. Warn once if the meeting channel is essentially silent.
+      console.log(`[noteai] channel RMS — tab(ch1)=${peakTab.toFixed(4)} mic(ch0)=${peakMic.toFixed(4)}`);
+      if (peakTab < 0.0005) console.warn('[noteai] meeting/tab channel is silent — other participants will NOT be transcribed');
+      peakTab = 0;
+      peakMic = 0;
+      ticks = 0;
+    }
   }, 150);
 }
 

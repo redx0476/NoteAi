@@ -90,7 +90,7 @@ function BotBar({ onMeetingReady }) {
             onChange={(e) => setUrl(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && send()}
             placeholder="Paste a Google Meet or Teams link — the notetaker joins for you"
-            className="input flex-1 bg-slate-50 dark:bg-slate-800"
+            className="input flex-1"
           />
           <button className="btn-primary shrink-0" onClick={send} disabled={sending || !url.trim()}>
             {sending ? 'Sending…' : 'Send notetaker'}
@@ -190,14 +190,14 @@ export default function Home() {
 
   return (
     <div className="h-full flex flex-col">
-      <header className="h-16 shrink-0 border-b border-slate-200 bg-white flex items-center gap-3 px-6 dark:border-slate-800 dark:bg-slate-900">
+      <header className="h-16 shrink-0 border-b border-[var(--line)] flex items-center gap-3 px-6" style={{ background: 'var(--surface)' }}>
         <div className="relative flex-1 max-w-xl">
-          <IconSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" width={18} height={18} />
+          <IconSearch className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--muted)' }} width={18} height={18} />
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Ask or search your meetings"
-            className="input pl-10 bg-slate-50 dark:bg-slate-800"
+            className="input pl-10"
           />
         </div>
         <label className="btn-outline cursor-pointer">
@@ -227,7 +227,7 @@ export default function Home() {
 
           {groups.map(([day, list]) => (
             <section key={day} className="mb-8">
-              <h2 className="text-sm font-semibold text-slate-500 mb-3">{day}</h2>
+              <h2 className="mb-3 text-[11px] font-semibold uppercase tracking-[0.18em]" style={{ color: 'var(--muted)' }}>{day}</h2>
               <div className="space-y-3">
                 {list.map((m) => (
                   <Link key={m.id} href={`/app/m/${m.id}`} className="card block p-5 hover:shadow-pop transition">
@@ -256,7 +256,7 @@ export default function Home() {
                             ))}
                           </div>
                           {(m.actionItems || []).length > 0 && (
-                            <span className="chip bg-slate-100 text-slate-500">
+                            <span className="chip text-[var(--accent-2)] dark:text-champagne" style={{ background: 'var(--accent-wash)' }}>
                               <IconStar width={13} height={13} /> {m.actionItems.length} actions
                             </span>
                           )}
